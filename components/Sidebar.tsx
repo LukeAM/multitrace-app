@@ -383,13 +383,14 @@ export default function Sidebar() {
       if (granolaUrl.includes('granola.ai')) {
         const res = await fetch(`/api/granola/extract?url=${encodeURIComponent(granolaUrl)}`);
         data = await res.json();
-        finalName = `Granola_${Date.now()}.md`;
+        const match = data.markdown.match(/^#\s+(.+)/m);
+        finalName = match ? match[1].trim() : `Granola_${Date.now()}.md`;
         const newFile = {
           id: uuidv4(),
           name: finalName,
           type: 'markdown' as const,
           content: data.markdown,
-          section: 'Artifacts',
+          section: 'artifacts',
           sourceUrl: granolaUrl,
           createdAt: Date.now(),
           created_by: user?.id,
@@ -414,7 +415,7 @@ export default function Sidebar() {
             name: notionTitle,
             type: 'markdown' as const,
             content: data.markdown,
-            section: 'Artifacts',
+            section: 'artifacts',
             sourceUrl: granolaUrl,
             createdAt: Date.now(),
             created_by: user?.id,

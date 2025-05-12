@@ -8,7 +8,7 @@ import 'highlight.js/styles/github.css'; // or any other highlight.js theme
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
-import { Copy, Trash2, Save, Settings, X, CornerDownLeft, ArrowDown } from 'lucide-react';
+import { Copy, Trash2, Save, Settings, X, CornerDownLeft, ArrowDown, File, Files, CheckSquare } from 'lucide-react';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 
 
@@ -308,8 +308,7 @@ export default function Copilot() {
       {/* Header/Toolbar */}
       <CardHeader className="flex flex-row items-center justify-between px-4 py-2 bg-white/90 backdrop-blur border-b border-gray-200">
         <div className="flex items-center gap-2">
-          <span className="text-2xl">🤖</span>
-          <span className="font-mono text-base font-semibold tracking-tight text-gray-900 opacity-90">Copilot</span>
+          <span className="font-semibold text-base text-gray-900 tracking-tight">Copilot</span>
         </div>
         <div className="flex items-center gap-1">
           <Tooltip>
@@ -433,12 +432,12 @@ export default function Copilot() {
       </CardFooter>
       {/* Context controls (collapsible) */}
       <div className="px-4 py-2 bg-white/90 border-t border-gray-200 text-xs text-gray-500 flex items-center gap-4">
-        <span className="font-mono text-xs">Context:</span>
+        <span className="font-medium text-xs">Context:</span>
         <div className="flex items-center gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant={contextMode === 'current' ? 'secondary' : 'ghost'} size="icon" onClick={() => setContextMode('current')} aria-label="Current file">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="2"/><path d="M8 8h8v8H8z" fill="currentColor"/></svg>
+                <File className="w-4 h-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Current file</TooltipContent>
@@ -446,7 +445,7 @@ export default function Copilot() {
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant={contextMode === 'subset' ? 'secondary' : 'ghost'} size="icon" onClick={() => setContextMode('subset')} aria-label="Subset">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="2"/><rect x="8" y="8" width="8" height="8" rx="1" fill="currentColor"/></svg>
+                <CheckSquare className="w-4 h-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Subset</TooltipContent>
@@ -454,7 +453,7 @@ export default function Copilot() {
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant={contextMode === 'all' ? 'secondary' : 'ghost'} size="icon" onClick={() => setContextMode('all')} aria-label="All files">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="2"/><path d="M6 6h12v12H6z" fill="currentColor"/></svg>
+                <Files className="w-4 h-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>All files</TooltipContent>

@@ -11,25 +11,28 @@ export const config = {
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<Response> {
   // Parse the form data
   const form = new formidable.IncomingForm();
   // formidable expects a Node.js IncomingMessage, so we need to get the raw req
   // @ts-ignore
-  return new Promise((resolve) => {
-    form.parse(req, async (err: Error | null, fields: Fields, files: Files) => {
+  return new Promise<Response>((resolve) => {
+    form.parse(req as any, async (err: Error | null, fields: Fields, files: Files) => {
       if (err) {
         resolve(
           new Response(JSON.stringify({ error: 'Error parsing form data' }), { status: 500 })
         );
         return;
       }
-      const file = files.file as File;
-      if (!file || Array.isArray(file)) {
+      let file = files.file as File | File[] | undefined;
+      if (!file) {
         resolve(
           new Response(JSON.stringify({ error: 'No file uploaded' }), { status: 400 })
         );
         return;
+      }
+      if (Array.isArray(file)) {
+        file = file[0];
       }
       try {
         const fileStream = fs.createReadStream(file.filepath);

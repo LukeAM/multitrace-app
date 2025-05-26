@@ -21,15 +21,26 @@ export type Project = {
   files: File[];
 };
 
-type State = {
+export interface TimelineItem {
+  id: string;
+  name: string;
+  title: string;
+  type: string;
+  date: string;
+  description: string;
+}
+
+export interface AppState {
   projects: Project[];
   currentFile: File | null;
   openFiles: File[];
-  setCurrentFile: (file: File) => void;
+  selectedTimelineEntry: TimelineItem | null;
+  setCurrentFile: (file: File | null) => void;
   addFileToProject: (projectId: string, files: File[]) => void;
   openFile: (file: File) => void;
   closeFile: (fileId: string) => void;
-};
+  setSelectedTimelineEntry: (entry: TimelineItem | null) => void;
+}
 
 const initialProjects: Project[] = [
   {
@@ -140,11 +151,13 @@ const initialProjects: Project[] = [
   },
 ];
 
-export const useAppStore = create<State>((set, get) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   projects: initialProjects,
-  currentFile: initialProjects[0].files.find(f => f.id === 'exec-summary') || null,
-  openFiles: [initialProjects[0].files.find(f => f.id === 'exec-summary')].filter(Boolean) as File[],
+  currentFile: null,
+  openFiles: [],
+  selectedTimelineEntry: null,
   setCurrentFile: (file) => set((state) => {
+    if (!file) return { currentFile: null };
     // Open the file if not already open
     const alreadyOpen = state.openFiles.some(f => f.id === file.id);
     return {
@@ -176,4 +189,5 @@ export const useAppStore = create<State>((set, get) => ({
     }
     return { openFiles, currentFile };
   }),
+  setSelectedTimelineEntry: (entry) => set({ selectedTimelineEntry: entry }),
 }));

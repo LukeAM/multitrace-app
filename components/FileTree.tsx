@@ -61,7 +61,7 @@ export default function FileTree() {
           )}
           <span className="truncate">{node.name}</span>
         </div>
-        {isDirectory && isExpanded && node.children?.map((child, index) => 
+        {isDirectory && isExpanded && node.children?.map((child) => 
           renderNode(child, `${path}/${child.name}`)
         )}
       </div>

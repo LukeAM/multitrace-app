@@ -4,28 +4,32 @@ import { Card } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useEffect, useState, ReactNode } from 'react';
+import { Briefcase, Users, BarChart2, UserCog } from 'lucide-react';
 
 type Theme = 'light' | 'dark' | 'theme-monokai' | 'theme-greenonblack';
 
 function Logo() {
   return (
-    <Card className="flex items-center gap-2 px-4 py-2 rounded-full shadow border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-      <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="16" cy="16" r="16" fill="#2563eb" />
-        <text x="50%" y="54%" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold" fontFamily="Inter, sans-serif" dy=".3em">MT</text>
-      </svg>
-      <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white">MultiTrace</span>
-    </Card>
+    <div className="w-full bg-[#444444] flex justify-end items-center h-16 px-0" style={{minHeight: '56px'}}>
+      <img src="/wisdom-in-motion-logo.png" alt="Wisdom-In-Motion Logo" className="w-14 h-14 rounded-sm" />
+    </div>
   );
 }
 
 export default function TopBar({
   children,
+  copilot,
+  setCopilot,
+  setMainView,
 }: {
-  children?: ReactNode;
+  children?: React.ReactNode;
+  copilot: boolean;
+  setCopilot: (value: boolean) => void;
+  setMainView: (view: 'accounts' | 'opportunities' | 'opportunityDetails' | 'default') => void;
 }) {
   const [theme, setTheme] = useState<Theme>('light');
   const [mounted, setMounted] = useState(false);
+  const [activeTab, setActiveTab] = useState('opportunities');
 
   useEffect(() => {
     setMounted(true);
@@ -42,40 +46,43 @@ export default function TopBar({
   }, [theme, mounted]);
 
   return (
-    <div className="flex items-center justify-between px-6 py-2 border-b border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md shadow-sm min-h-0">
-      {/* Logo area */}
-      <div className="flex items-center gap-6">
+    <div className="flex flex-col h-full w-16 bg-[#444444] text-white select-none">
+      {/* Logo centered horizontally at the top */}
+      <div className="flex items-center justify-center w-full mt-4 mb-2">
         <Logo />
-        {/* Nav */}
-        <nav className="flex gap-2 ml-2">
-          {['Opportunities', 'Accounts', 'Contacts', 'Reports', 'AI Agents'].map((item, idx) => (
-            <TooltipProvider key={item}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" className="px-3 py-1 text-sm font-medium" style={{marginLeft: idx === 0 ? 0 : 2}}>
-                    {item}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{item}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          ))}
-        </nav>
       </div>
-      {/* Theme selector */}
-      <div className="flex items-center gap-3">
-        <Select value={theme} onValueChange={v => setTheme(v as Theme)}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Theme" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="light">Light</SelectItem>
-            <SelectItem value="dark">Dark</SelectItem>
-            <SelectItem value="theme-monokai">Monokai</SelectItem>
-            <SelectItem value="theme-greenonblack">Green</SelectItem>
-          </SelectContent>
-        </Select>
-        {children && <div className="ml-2 flex items-center">{children}</div>}
+      {/* Menu icons */}
+      <div className="flex flex-col items-center gap-6 flex-1 mt-2">
+        <button className={`hover:text-blue-400 relative ${activeTab === 'opportunities' ? 'text-blue-400' : ''}`}
+          title="Opportunities"
+          onClick={() => {
+            setActiveTab('opportunities');
+            setMainView('accounts');
+          }}
+        >
+          {/* Triangle indicator for active item, now pointing left and flush to the right edge */}
+          {activeTab === 'opportunities' && (
+            <span className="absolute left-[44px] top-1/2 -translate-y-1/2 z-10">
+              <svg width="10" height="12" viewBox="0 0 10 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="10,0 0,6 10,12" fill="#f5f6fa" />
+              </svg>
+            </span>
+          )}
+          <Briefcase className="w-6 h-6" />
+        </button>
+        <button className="hover:text-blue-400" title="Accounts">
+          <Users className="w-6 h-6" />
+        </button>
+        <button className="hover:text-blue-400" title="Reporting">
+          <BarChart2 className="w-6 h-6" />
+        </button>
+        <button className="hover:text-blue-400" title="Agents">
+          <UserCog className="w-6 h-6" />
+        </button>
+      </div>
+      {/* Clerk account widget at the bottom */}
+      <div className="flex flex-col items-center mb-4 mt-auto">
+        {children}
       </div>
     </div>
   );

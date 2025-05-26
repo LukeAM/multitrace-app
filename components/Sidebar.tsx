@@ -1,7 +1,7 @@
 'use client';
 import { useAppStore } from '@/lib/store';
 import { Project, File } from '@/lib/ProjectContext';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { createProjectWithTemplate } from '@/lib/createProjectWithTemplate';
 import { useUser } from '@clerk/nextjs';
@@ -11,8 +11,60 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Users, Target, CreditCard, Filter } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 
 type AddFileSection = 'artifacts' | 'legals' | 'channels';
+
+// Define TimelineItem type
+type TimelineItem = {
+  id: string;
+  date: string;
+  type: 'status' | 'email' | 'granola' | 'slack' | 'notion';
+  title: string;
+  description: string;
+  icon: string;
+  topics?: string[];
+  metadata?: {
+    createdBy?: string;
+    source?: string;
+    recipient?: string;
+    role?: string;
+    emailId?: string;
+    participants?: string[];
+    duration?: string;
+    transcriptId?: string;
+    summary?: string;
+    channel?: string;
+    type?: 'internal' | 'external';
+    members?: string[];
+    author?: string;
+    documentId?: string;
+    status?: string;
+    qualifiedBy?: string;
+    reason?: string;
+  };
+};
+
+// Define stakeholder types
+type StakeholderEngagement = {
+  date: string;
+  type: string;
+  description: string;
+};
+
+type StakeholderData = {
+  role: string;
+  company: string;
+  engagement: StakeholderEngagement[];
+};
+
+type Stakeholders = {
+  [key: string]: StakeholderData;
+};
 
 // Add a new modal component for adding files
 function AddFileModal({ open, onClose, section, onAdd }: { open: boolean, onClose: () => void, section: AddFileSection, onAdd: (file: File) => void }) {
@@ -248,539 +300,505 @@ function FileTypeIcon({ type }: { type: string }) {
   }
 }
 
-export default function Sidebar() {
-  const { projects, currentFile, setCurrentFile, addFileToProject } = useAppStore();
-  const { user } = useUser();
-  const supabase = useClerkSupabaseAuth();
-  const [expanded, setExpanded] = useState({
-    channels: false,
-    artifacts: false,
-    legals: false,
-    timeline: true,
-    files: true,
-    mcp: false,
-  });
-  const [isDark, setIsDark] = useState(false);
-  const [showGranolaInput, setShowGranolaInput] = useState(false);
-  const [granolaUrl, setGranolaUrl] = useState('');
-  const [messages, setMessages] = useState<{ role: 'user' | 'ai', text: string }[]>([]);
-  const [miniMenuTab, setMiniMenuTab] = useState<'opportunity' | 'collateral'>('opportunity');
-  const [theme, setTheme] = useState('light');
-  const [isAddingArtifact, setIsAddingArtifact] = useState(false);
-  const [showCreate, setShowCreate] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [projectName, setProjectName] = useState('');
-  const [template, setTemplate] = useState('default');
-  const [addModal, setAddModal] = useState<{ open: boolean, section: AddFileSection | null }>({ open: false, section: null });
-
-  const toggle = (key: keyof typeof expanded) => {
-    setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
+// Add billing and usage types
+type BillingEvent = {
+  id: string;
+  date: string;
+  type: 'invoice' | 'payment' | 'usage' | 'user';
+  amount?: number;
+  currency?: string;
+  description: string;
+  status?: 'paid' | 'pending' | 'overdue';
+  users?: number;
+  consumption?: {
+    units: number;
+    type: string;
   };
+};
 
-  async function handleCreateProject(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    console.log('handleCreateProject called');
-    if (!user?.id) {
-      alert('User not loaded. Please sign in.');
-      console.log('No user loaded');
-      return;
-    }
-    setCreating(true);
-    try {
-      const teamId = 'demo-team-id';
-      console.log('Sidebar supabase:', supabase);
-      const result = await createProjectWithTemplate(supabase, projectName || 'Untitled Project', user.id, teamId);
-      console.log('createProjectWithTemplate result:', result);
-      if (!result) {
-        alert('Failed to create project. Check the console for errors.');
-        setCreating(false);
-        return;
-      }
-      window.location.reload();
-    } catch (err) {
-      console.error('Error in handleCreateProject:', err);
-      alert('An error occurred. Check the console for details.');
-      setCreating(false);
-    }
+// Add billing data
+const billingData: BillingEvent[] = [
+  {
+    id: 'billing-1',
+    date: '2024-03-15',
+    type: 'user',
+    users: 5,
+    description: 'Initial user setup'
+  },
+  {
+    id: 'billing-2',
+    date: '2024-03-20',
+    type: 'invoice',
+    amount: 2500,
+    currency: 'USD',
+    description: 'Initial setup invoice',
+    status: 'paid'
+  },
+  {
+    id: 'billing-3',
+    date: '2024-03-25',
+    type: 'usage',
+    consumption: {
+      units: 1000,
+      type: 'API calls'
+    },
+    description: 'First month usage'
+  },
+  {
+    id: 'billing-4',
+    date: '2024-04-01',
+    type: 'user',
+    users: 8,
+    description: 'Additional users added'
+  },
+  {
+    id: 'billing-5',
+    date: '2024-04-05',
+    type: 'payment',
+    amount: 5000,
+    currency: 'USD',
+    description: 'Monthly subscription payment',
+    status: 'paid'
   }
+];
 
-  if (!projects.length) {
-    return (
-      <div className="p-4 text-gray-400 flex flex-col items-center justify-center h-full">
-        <div>No projects found.</div>
-        <button
-          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          onClick={() => setShowCreate(true)}
-        >
-          Create Project
-        </button>
-        {showCreate && (
-          <form
-            className="mt-4 bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col gap-2 w-full max-w-xs"
-            onSubmit={handleCreateProject}
-          >
-            <label className="text-xs font-semibold text-gray-700 dark:text-gray-200">Project Name</label>
-            <input
-              className="border rounded px-2 py-1 text-sm"
-              value={projectName}
-              onChange={e => setProjectName(e.target.value)}
-              placeholder="Project Name"
-              required
-            />
-            <label className="text-xs font-semibold text-gray-700 dark:text-gray-200 mt-2">Template</label>
-            <select className="border rounded px-2 py-1 text-sm" value={template} onChange={e => setTemplate(e.target.value)}>
-              <option value="default">Getting Started Project (only option)</option>
-            </select>
-            <button
-              type="submit"
-              className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-60"
-              disabled={creating}
-            >
-              {creating ? 'Creating...' : 'Create'}
-            </button>
-          </form>
-        )}
-      </div>
-    );
-  }
+// Define types for knowledge base
+type KnowledgeBaseItem = {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  notionId: string;
+};
 
-  const project = projects[0];
+type KnowledgeBaseCategory = {
+  title: string;
+  items: KnowledgeBaseItem[];
+};
 
-  const grouped = {
-    channels: [
+type KnowledgeBaseCategories = {
+  [key: string]: KnowledgeBaseCategory;
+};
+
+// Add knowledge base data with categories
+const knowledgeBaseCategories: KnowledgeBaseCategories = {
+  sales: {
+    title: 'Sales Process',
+    items: [
       {
-        id: 'slack-1',
-        name: 'sales-team',
-        icon: (
-          <svg width="16" height="16" viewBox="0 0 122.8 122.8" style={{display: 'inline', verticalAlign: 'middle', background: '#f3f4f6', padding: 2, borderRadius: 3}}><g><path fill="#36C5F0" d="M30.3 76.7c0 6.1-5 11.1-11.1 11.1S8 82.8 8 76.7s5-11.1 11.1-11.1h11.1v11.1zm5.6 0c0-6.1 5-11.1 11.1-11.1s11.1 5 11.1 11.1v27.8c0 6.1-5 11.1-11.1 11.1s-11.1-5-11.1-11.1V76.7z"></path><path fill="#2EB67D" d="M46.9 30.3c-6.1 0-11.1-5-11.1-11.1S40.8 8 46.9 8s11.1 5 11.1 11.1v11.1H46.9zm0 5.6c6.1 0 11.1 5 11.1 11.1s-5 11.1-11.1 11.1H19.1c-6.1 0-11.1-5-11.1-11.1s5-11.1 11.1-11.1h27.8z"></path><path fill="#ECB22E" d="M92.5 46.1c0-6.1 5-11.1 11.1-11.1s11.1 5 11.1 11.1-5 11.1-11.1 11.1H92.5V46.1zm-5.6 0c0 6.1-5 11.1-11.1 11.1s-11.1-5-11.1-11.1V18.3c0-6.1 5-11.1 11.1-11.1s11.1 5 11.1 11.1v27.8z"></path><path fill="#E01E5A" d="M76.1 92.5c6.1 0 11.1 5 11.1 11.1s-5 11.1-11.1 11.1-11.1-5-11.1-11.1V92.5h11.1zm0-5.6c-6.1 0-11.1-5-11.1-11.1s5-11.1 11.1-11.1h27.8c6.1 0 11.1 5 11.1 11.1s-5 11.1-11.1 11.1H76.1z"></path></g></svg>
-        ),
-        sample: 'Q3 pipeline review at 2pm. Please RSVP!'
+        id: 'kb-1',
+        title: 'Qualifications',
+        description: 'Customer qualification criteria and process',
+        icon: '🎯',
+        notionId: 'qualifications-123'
       },
       {
-        id: 'slack-2',
-        name: 'customer-support',
-        icon: (
-          <svg width="16" height="16" viewBox="0 0 122.8 122.8" style={{display: 'inline', verticalAlign: 'middle', background: '#f3f4f6', padding: 2, borderRadius: 3}}><g><path fill="#36C5F0" d="M30.3 76.7c0 6.1-5 11.1-11.1 11.1S8 82.8 8 76.7s5-11.1 11.1-11.1h11.1v11.1zm5.6 0c0-6.1 5-11.1 11.1-11.1s11.1 5 11.1 11.1v27.8c0 6.1-5 11.1-11.1 11.1s-11.1-5-11.1-11.1V76.7z"></path><path fill="#2EB67D" d="M46.9 30.3c-6.1 0-11.1-5-11.1-11.1S40.8 8 46.9 8s11.1 5 11.1 11.1v11.1H46.9zm0 5.6c6.1 0 11.1 5 11.1 11.1s-5 11.1-11.1 11.1H19.1c-6.1 0-11.1-5-11.1-11.1s5-11.1 11.1-11.1h27.8z"></path><path fill="#ECB22E" d="M92.5 46.1c0-6.1 5-11.1 11.1-11.1s11.1 5 11.1 11.1-5 11.1-11.1 11.1H92.5V46.1zm-5.6 0c0 6.1-5 11.1-11.1 11.1s-11.1-5-11.1-11.1V18.3c0-6.1 5-11.1 11.1-11.1s11.1 5 11.1 11.1v27.8z"></path><path fill="#E01E5A" d="M76.1 92.5c6.1 0 11.1 5 11.1 11.1s-5 11.1-11.1 11.1-11.1-5-11.1-11.1V92.5h11.1zm0-5.6c-6.1 0-11.1-5-11.1-11.1s5-11.1 11.1-11.1h27.8c6.1 0 11.1 5 11.1 11.1s-5 11.1-11.1 11.1H76.1z"></path></g></svg>
-        ),
-        sample: 'Customer asked about onboarding docs.'
+        id: 'kb-2',
+        title: 'Stage Definition',
+        description: 'Sales stages and progression criteria',
+        icon: '📊',
+        notionId: 'stages-456'
+      },
+      {
+        id: 'kb-7',
+        title: 'Core Value Proposition',
+        description: 'Key value propositions and benefits',
+        icon: '💎',
+        notionId: 'value-prop-404'
+      },
+      {
+        id: 'kb-8',
+        title: 'Objection Handling',
+        description: 'Common objections and response strategies',
+        icon: '🛡️',
+        notionId: 'objections-505'
+      },
+      {
+        id: 'kb-9',
+        title: 'Pricing Strategy',
+        description: 'Pricing models and negotiation guidelines',
+        icon: '💰',
+        notionId: 'pricing-606'
+      },
+      {
+        id: 'kb-10',
+        title: 'Competitive Analysis',
+        description: 'Competitor comparison and positioning',
+        icon: '📈',
+        notionId: 'competitors-707'
       }
-    ],
-    artifacts: projects[0] ? projects[0].files.filter((f: File) => f.section === 'Artifacts') : [],
-    legals: projects[0] ? projects[0].files.filter((f: File) => f.section === 'Legals') : [],
-    timeline: projects[0] ? projects[0].files.filter((f: File) => f.section === 'Timeline') : [],
-    files: projects[0] ? projects[0].files.filter((f: File) => !f.section) : [],
-  };
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDark);
-  }, [isDark]);
-
-  const handleGranolaSubmit = async () => {
-    if (!granolaUrl.trim()) return;
-    setIsAddingArtifact(true);
-    try {
-      let data, finalName;
-      if (granolaUrl.includes('granola.ai')) {
-        const res = await fetch(`/api/granola/extract?url=${encodeURIComponent(granolaUrl)}`);
-        data = await res.json();
-        const match = data.markdown.match(/^#\s+(.+)/m);
-        finalName = match ? match[1].trim() : `Granola_${Date.now()}.md`;
-        const newFile = {
-          id: uuidv4(),
-          name: finalName,
-          type: 'markdown' as const,
-          content: data.markdown,
-          section: 'artifacts',
-          sourceUrl: granolaUrl,
-          createdAt: Date.now(),
-          created_by: user?.id,
-          project_id: project?.id,
-        };
-        // Save to Supabase
-        await supabase.from('files').insert([newFile]);
-        setCurrentFile(newFile);
-        if (project?.id) addFileToProject(project.id, [{ ...newFile, type: 'markdown' }]);
-        setGranolaUrl('');
-        setShowGranolaInput(false);
-        setIsAddingArtifact(false);
-        return;
-      } else if (/notion\.(so|site)/.test(granolaUrl)) {
-        try {
-          const res = await fetch(`/api/notion/extract?url=${encodeURIComponent(granolaUrl)}`);
-          data = await res.json();
-          const match = data.markdown.match(/^#+\s+(.+)/m);
-          const notionTitle = match ? match[1].trim() : `Notion_${Date.now()}`;
-          const newFile = {
-            id: uuidv4(),
-            name: notionTitle,
-            type: 'markdown' as const,
-            content: data.markdown,
-            section: 'artifacts',
-            sourceUrl: granolaUrl,
-            createdAt: Date.now(),
-            created_by: user?.id,
-            project_id: project?.id,
-          };
-          // Save to Supabase
-          await supabase.from('files').insert([newFile]);
-          setCurrentFile(newFile);
-          if (project?.id) addFileToProject(project.id, [{ ...newFile, type: 'markdown' }]);
-        } finally {
-          setGranolaUrl('');
-          setShowGranolaInput(false);
-          setIsAddingArtifact(false);
-        }
-        return;
+    ]
+  },
+  technical: {
+    title: 'Technical Resources',
+    items: [
+      {
+        id: 'kb-3',
+        title: 'Model Types',
+        description: 'Overview of available model types',
+        icon: '🤖',
+        notionId: 'models-789'
+      },
+      {
+        id: 'kb-4',
+        title: 'Current Models in Production',
+        description: 'Active models and their use cases',
+        icon: '⚡',
+        notionId: 'prod-models-101'
+      },
+      {
+        id: 'kb-5',
+        title: 'Model API',
+        description: 'API documentation and integration guides',
+        icon: '🔌',
+        notionId: 'api-docs-202'
+      },
+      {
+        id: 'kb-6',
+        title: 'On-prem Deployment',
+        description: 'On-premises deployment guide',
+        icon: '🏢',
+        notionId: 'onprem-303'
+      },
+      {
+        id: 'kb-11',
+        title: 'Security & Compliance',
+        description: 'Security measures and compliance requirements',
+        icon: '🔒',
+        notionId: 'security-808'
+      },
+      {
+        id: 'kb-12',
+        title: 'Performance Benchmarks',
+        description: 'Model performance metrics and benchmarks',
+        icon: '📊',
+        notionId: 'benchmarks-909'
       }
-      setIsAddingArtifact(false);
-    } catch (err) {
-      console.error('Failed to fetch content:', err);
-      setIsAddingArtifact(false);
+    ]
+  },
+  customer: {
+    title: 'Customer Success',
+    items: [
+      {
+        id: 'kb-13',
+        title: 'Implementation Guide',
+        description: 'Step-by-step implementation process',
+        icon: '🚀',
+        notionId: 'implementation-1010'
+      },
+      {
+        id: 'kb-14',
+        title: 'Best Practices',
+        description: 'Recommended practices and use cases',
+        icon: '⭐',
+        notionId: 'best-practices-1111'
+      },
+      {
+        id: 'kb-15',
+        title: 'Troubleshooting',
+        description: 'Common issues and solutions',
+        icon: '🔧',
+        notionId: 'troubleshooting-1212'
+      },
+      {
+        id: 'kb-16',
+        title: 'Training Materials',
+        description: 'Customer training resources',
+        icon: '📚',
+        notionId: 'training-1313'
+      }
+    ]
+  }
+};
+
+// Add topic types and data
+type Topic = {
+  id: string;
+  name: string;
+  color: string;
+};
+
+const topics: Topic[] = [
+  { id: 'technical', name: 'Technical', color: 'blue' },
+  { id: 'sales', name: 'Sales', color: 'green' },
+  { id: 'legal', name: 'Legal', color: 'purple' },
+  { id: 'finance', name: 'Finance', color: 'orange' }
+];
+
+// Update timeline data to include topics
+const timelineData: TimelineItem[] = [
+  {
+    id: 'timeline-1',
+    date: '2024-03-15',
+    type: 'status',
+    title: 'Opportunity Created',
+    description: 'Initial opportunity created by John Smith',
+    icon: '🎯',
+    topics: ['sales'],
+    metadata: {
+      createdBy: 'John Smith',
+      source: 'CRM Import'
     }
-  };
+  },
+  {
+    id: 'timeline-2',
+    date: '2024-03-16',
+    type: 'email',
+    title: 'Initial Outreach',
+    description: 'Sent introduction email to Sarah Chen (CTO)',
+    icon: '📧',
+    topics: ['sales'],
+    metadata: {
+      recipient: 'Sarah Chen',
+      role: 'CTO',
+      emailId: 'email-123'
+    }
+  },
+  {
+    id: 'timeline-3',
+    date: '2024-03-17',
+    type: 'granola',
+    title: 'Discovery Call',
+    description: 'Initial discovery call with Sarah Chen',
+    icon: '🎙️',
+    topics: ['technical', 'sales'],
+    metadata: {
+      participants: ['Sarah Chen', 'John Smith', 'Alex Rodriguez'],
+      duration: '45m',
+      transcriptId: 'granola-456',
+      summary: 'Discussed current infrastructure and pain points'
+    }
+  },
+  {
+    id: 'timeline-4',
+    type: 'slack',
+    date: '2024-03-17',
+    title: 'Internal Channel Created',
+    description: 'Created #acme-enterprise channel',
+    icon: '💬',
+    topics: ['technical'],
+    metadata: {
+      channel: 'acme-enterprise',
+      type: 'internal',
+      members: ['John Smith', 'Alex Rodriguez', 'Maria Garcia']
+    }
+  },
+  {
+    id: 'timeline-5',
+    type: 'slack',
+    date: '2024-03-18',
+    title: 'External Channel Created',
+    description: 'Created shared channel with ACME team',
+    icon: '🤝',
+    topics: ['technical', 'sales'],
+    metadata: {
+      channel: 'acme-partnership',
+      type: 'external',
+      members: ['Sarah Chen', 'John Smith', 'Alex Rodriguez']
+    }
+  },
+  {
+    id: 'timeline-6',
+    type: 'notion',
+    date: '2024-03-18',
+    title: 'Requirements Doc',
+    description: 'Created initial requirements document',
+    icon: '📝',
+    topics: ['technical'],
+    metadata: {
+      author: 'Alex Rodriguez',
+      documentId: 'notion-789',
+      status: 'Draft'
+    }
+  },
+  {
+    id: 'timeline-7',
+    type: 'status',
+    date: '2024-03-19',
+    title: 'Qualified',
+    description: 'Opportunity qualified by sales team',
+    icon: '✅',
+    topics: ['sales', 'finance'],
+    metadata: {
+      qualifiedBy: 'John Smith',
+      reason: 'Budget approved, technical requirements met'
+    }
+  }
+];
 
-  // Dummy MCP updates
-  const mcpUpdates = [
-    { id: 'mcp-1', name: 'Current MCP Context', content: 'Current model context protocol update.' },
-    { id: 'mcp-2', name: 'History: 2024-06-01', content: 'Previous MCP update.' },
-  ];
+interface Account {
+  id: string;
+  name: string;
+  logoUrl?: string;
+  type?: 'new_business' | 'renewal' | 'expansion';
+}
 
-  // Simple AI stars icon for MCP
-  const MCPStarIcon = () => (
-    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" style={{ display: 'inline', verticalAlign: 'middle' }}>
-      <path d="M10 2.5l1.09 3.36a1 1 0 00.95.69h3.54c.82 0 1.16 1.05.5 1.54l-2.87 2.09a1 1 0 00-.36 1.12l1.09 3.36c.25.78-.64 1.43-1.3.95l-2.87-2.09a1 1 0 00-1.18 0l-2.87 2.09c-.66.48-1.55-.17-1.3-.95l1.09-3.36a1 1 0 00-.36-1.12L3.92 8.09c-.66-.49-.32-1.54.5-1.54h3.54a1 1 0 00.95-.69L10 2.5z" fill="#6366f1"/>
-      <circle cx="16" cy="4" r="1.5" fill="#fbbf24"/>
-      <circle cx="4" cy="16" r="1" fill="#fbbf24"/>
-    </svg>
+interface SidebarProps {
+  accounts: Account[];
+  onSelect: (account: Account) => void;
+  selectedAccountId?: string;
+  onAccountCreated?: () => void;
+  showDefault?: boolean;
+  onShowDefault?: (show: boolean) => void;
+}
+
+const FILTERS = [
+  { key: 'new_business', label: 'New Business' },
+  { key: 'renewal', label: 'Renewals' },
+  { key: 'expansion', label: 'Expansion' },
+];
+
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase();
+}
+
+export default function Sidebar({ accounts, onSelect, selectedAccountId, onAccountCreated, showDefault, onShowDefault }: SidebarProps) {
+  const [activeFilter, setActiveFilter] = useState<'new_business' | 'renewal' | 'expansion'>('new_business');
+  const [showForm, setShowForm] = useState(false);
+  const [accountName, setAccountName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { user, isLoaded } = useUser();
+  const teamId = user?.publicMetadata?.team_id;
+
+  const filteredAccounts = accounts.filter(
+    (acc) => acc.type === activeFilter
   );
 
+  async function handleCreateAccount(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    if (!teamId) {
+      setError('No team ID found for user.');
+      setLoading(false);
+      return;
+    }
+    try {
+      const { data, error } = await useClerkSupabaseAuth()
+        .from('accounts')
+        .insert([{ name: accountName, team_id: teamId }])
+        .select();
+      if (error) throw error;
+      setAccountName('');
+      setShowForm(false);
+      if (onAccountCreated) onAccountCreated();
+    } catch (err: any) {
+      setError(err.message || 'Failed to create account');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <div className="w-64 h-full relative pt-0 px-0 pb-0 border-r flex flex-col text-sm theme-monokai:bg-[#1e1f1c] theme-monokai:text-[#F8F8F2] theme-greenonblack:bg-black theme-greenonblack:text-[#33FF33] dark:bg-gray-900 dark:text-gray-100 border-gray-200 dark:border-gray-700 theme-monokai:border-[#3e3d32] theme-greenonblack:border-[#003300]">
-      <button
-        className="absolute text-base text-gray-400 hover:text-red-500 transition-colors rounded focus:outline-none p-1 z-10"
-        style={{
-          top: '-4px',
-          right: '-4px',
-          lineHeight: 1,
-          height: 28,
-          width: 28,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}
-        title="Close Sidebar"
-        onClick={() => {
-          const event = new CustomEvent('closeSidebar');
-          window.dispatchEvent(event);
-        }}
-      >
-        ×
-      </button>
-      <div>
-        <div className="flex items-center w-full text-xs font-semibold bg-gray-100 dark:bg-gray-800 theme-monokai:bg-[#23241f] theme-greenonblack:bg-black border-b border-gray-300 dark:border-gray-700 theme-monokai:border-[#3e3d32] theme-greenonblack:border-[#003300] relative" style={{minHeight: 32}}>
-          <div className="flex h-full">
-            {[
-              { key: 'opportunity', label: 'Opportunity' },
-              { key: 'collateral', label: 'Collateral' }
-            ].map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setMiniMenuTab(tab.key as typeof miniMenuTab)}
-                className={`py-2 px-3 transition-colors border-0
-                  ${miniMenuTab === tab.key
-                    ? 'bg-white dark:bg-gray-700 theme-monokai:bg-[#272822] theme-greenonblack:bg-black text-blue-600 dark:text-blue-400 theme-monokai:text-[#A6E22E] theme-greenonblack:text-[#33FF33]'
-                    : 'text-gray-500 dark:text-gray-300 theme-monokai:text-[#75715E] theme-greenonblack:text-[#009900] hover:bg-gray-200 dark:hover:bg-gray-700 theme-monokai:hover:bg-[#3e3d32] theme-greenonblack:hover:bg-[#002200]'}
-                  ${tab.key !== 'collateral' ? 'border-r border-gray-300 dark:border-gray-700 theme-monokai:border-[#3e3d32] theme-greenonblack:border-[#003300]' : ''}`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+    <div className="w-72 h-full bg-[#444444] text-white flex flex-col border-r border-gray-800 shadow-lg">
+      {/* Filter Tabs */}
+      <div className="flex items-center w-full text-xs font-semibold bg-[#444444] rounded-t-lg border-b border-gray-700" style={{ minHeight: 40 }}>
+        <div className="flex h-full w-full">
+          {FILTERS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveFilter(tab.key as typeof activeFilter)}
+              className={`relative py-2 px-4 transition-colors border-0 flex-1
+                ${activeFilter === tab.key
+                  ? 'text-yellow-400 after:absolute after:left-1/2 after:-translate-x-1/2 after:bottom-0 after:w-8 after:h-1 after:rounded-full after:bg-yellow-400'
+                  : 'text-gray-400 hover:text-yellow-400'}`}
+              style={{ minWidth: 90 }}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-2">
-        {(['files', 'channels', 'artifacts', 'legals'] as const).map((section, idx) => (
-          <div key={section}>
-            {idx > 0 && (
-              <hr className="my-2 border-t border-gray-300 dark:border-gray-700" />
-            )}
-            <div className="flex items-center justify-between mb-1">
-              <Button
-                variant="ghost"
-                className="text-left font-semibold flex items-center flex-1 px-0 py-1 justify-start"
-                onClick={() => toggle(section)}
-                aria-label={`Toggle ${section}`}
-              >
-                <span className="mr-2 text-xs">{expanded[section] ? '▼' : '▶'}</span>
-                <span>{section.charAt(0).toUpperCase() + section.slice(1)}</span>
-              </Button>
-              {(section === 'channels' || section === 'artifacts' || section === 'legals') && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="ml-1"
-                        onClick={() => setAddModal({ open: true, section: section as AddFileSection })}
-                        aria-label={`Add ${section.charAt(0).toUpperCase() + section.slice(1)}`}
-                      >
-                        <span className="text-lg font-bold">+</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      Add {section.charAt(0).toUpperCase() + section.slice(1)}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </div>
-
-            {showGranolaInput && section === 'artifacts' && (
-              <div className="mb-2 flex flex-col items-center">
-                <div className="flex items-center mb-1 gap-2">
-                  <img src="/granola_logo.jpeg" alt="Granola" style={{ width: 22, height: 22, borderRadius: 4 }} />
-                  <img src="/notion.png" alt="Notion" style={{ width: 22, height: 22, borderRadius: 4 }} />
-                </div>
-                <input
-                  type="text"
-                  value={granolaUrl}
-                  onChange={(e) => setGranolaUrl(e.target.value)}
-                  placeholder="Paste Granola or Notion public link..."
-                  className="w-full p-1 border text-xs rounded mb-1 bg-white dark:bg-gray-800 dark:text-white"
-                />
+      {/* Create Account Button */}
+      <div className="p-3 flex items-center justify-between bg-[#444444]">
+        <button
+          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-semibold w-full"
+          onClick={() => setShowForm(true)}
+          disabled={!isLoaded || !teamId}
+          title={!isLoaded ? 'Loading user...' : !teamId ? 'No team ID found for user' : ''}
+        >
+          + Create Account
+        </button>
+      </div>
+      {/* Create Account Modal */}
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-96 max-w-full text-gray-900">
+            <h2 className="text-lg font-bold mb-4">Create Account</h2>
+            <form onSubmit={handleCreateAccount} className="flex flex-col gap-3">
+              <input
+                type="text"
+                value={accountName}
+                onChange={e => setAccountName(e.target.value)}
+                placeholder="Account name"
+                className="border border-gray-300 rounded px-2 py-1 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                required
+                disabled={loading || !teamId}
+              />
+              {error && <span className="text-xs text-red-600">{error}</span>}
+              <div className="flex gap-2 mt-2">
                 <button
-                  onClick={handleGranolaSubmit}
-                  className="w-full text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center justify-center gap-2 disabled:opacity-60"
-                  disabled={isAddingArtifact}
+                  type="submit"
+                  className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+                  disabled={loading || !accountName.trim() || !teamId}
                 >
-                  {isAddingArtifact && (
-                    <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{marginRight: 4}}>
-                      <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="4" opacity="0.2" />
-                      <path d="M12 2a10 10 0 0 1 10 10" stroke="#fff" strokeWidth="4" strokeLinecap="round" />
-                    </svg>
-                  )}
-                  Add Artifact
+                  {loading ? 'Creating...' : 'Create'}
+                </button>
+                <button
+                  type="button"
+                  className="px-3 py-1 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 text-sm"
+                  onClick={() => { setShowForm(false); setError(null); }}
+                  disabled={loading}
+                >
+                  Cancel
                 </button>
               </div>
-            )}
-
-            {(section === 'channels' && expanded['channels']) && (
-              <ul className="space-y-1 px-0.5 py-1">
-                {grouped.channels.map((channel) => (
-                  <li key={channel.id} className="flex items-center pl-2 pr-0 py-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 theme-monokai:hover:bg-[#3e3d32] theme-greenonblack:hover:bg-[#002200] cursor-pointer">
-                    <span className="flex items-center gap-2 flex-shrink-0">
-                      {channel.icon}
-                    </span>
-                    <span className="text-xs font-semibold" title={channel.sample}>#{channel.name}</span>
-                    <button className="ml-auto mr-1 p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded" title="Sync Channel">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="#888"><path d="M12 2a10 10 0 1 0 10 10h-2a8 8 0 1 1-8-8V2z"/><path d="M12 2v6l4-4-4-2z"/></svg>
-                    </button>
-                    <button
-                      onClick={() => {
-                        // Remove the channel from the project
-                        const updatedFiles = project.files.filter(f => f.id !== channel.id);
-                        addFileToProject(project.id, updatedFiles.map(f => ({ ...f, type: (f.type || 'markdown') as File["type"] })));
-                      }}
-                      className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                      title="Delete Channel"
-                    >
-                      <svg width="13" height="13" viewBox="0 0 20 20" fill="none"><path d="M6 8v6a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V8" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 11v2" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M11 11v2" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M4 6h12" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M8 6V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {(expanded[section]) && section !== 'channels' && (
-              <div className={`transition-all duration-200 ${expanded[section] ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
-                <ul className="space-y-1">
-                  {grouped[section].map((file: File) => {
-                    const isNotion = file.sourceUrl && file.sourceUrl.includes('notion');
-                    const isGranola = file.content?.includes('granola.ai');
-                    const isMarkdown = file.type === 'markdown';
-                    const isEmail = file.name.toLowerCase().includes('email');
-                    const isMaster = section === 'files';
-                    const isSelected = currentFile?.id === file.id;
-                    const fileDisplayName = isNotion
-                      ? (typeof file.content === 'string' ? (file.content.match(/^#\s+(.+)/m)?.[1] || 'Notion Page') : 'Notion Page')
-                      : file.name;
-                    return (
-                      <li
-                        key={file.id}
-                        className={`flex items-center pl-2 pr-0 py-1 rounded gap-2 text-xs font-medium transition-all
-                          ${isSelected ? 'bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 shadow' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}
-                        `}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <span className="flex items-center gap-2 flex-shrink-0">
-                          <FileTypeIcon type={file.type} />
-                        </span>
-                        <button
-                          onClick={() => {
-                            setCurrentFile(file);
-                          }}
-                          className={`truncate max-w-[120px] flex-1 text-left bg-transparent border-none outline-none cursor-pointer
-                            ${isSelected ? 'font-bold text-blue-700 dark:text-blue-400' : 'font-medium text-black dark:text-gray-100'}`}
-                          title={fileDisplayName}
-                        >
-                          <span className="truncate" style={{ maxWidth: 100 }}>{fileDisplayName}</span>
-                          {file.mandatory && <span className="text-red-500 ml-1">*</span>}
-                        </button>
-                        {/* Action buttons with tooltips */}
-                        {isNotion && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="ml-2"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const notionUrl = file.sourceUrl;
-                                    if (!notionUrl) return;
-                                    fetch(`/api/notion/extract?url=${encodeURIComponent(notionUrl)}`)
-                                      .then(res => res.json())
-                                      .then(data => {
-                                        if (file.content !== data.markdown) {
-                                          const match = data.markdown.match(/^#+\s+(.+)/m);
-                                          const notionTitle = match ? match[1].trim() : `Notion_${Date.now()}`;
-                                          addFileToProject(project.id, project.files.map(f =>
-                                            f.id === file.id
-                                              ? { ...f, name: notionTitle, content: data.markdown, type: 'markdown' }
-                                              : { ...f, type: (f.type || 'markdown') as File["type"] }
-                                          ));
-                                        } else {
-                                          alert('No changes detected.');
-                                        }
-                                      });
-                                  }}
-                                  aria-label="Refresh from Notion"
-                                >
-                                  <span role="img" aria-label="Refresh">🔄</span>
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Refresh from Notion</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
-                        {section !== 'files' && section !== 'legals' && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="ml-2"
-                                  onClick={() => {
-                                    // Remove the file from the project
-                                    const updatedFiles = project.files.filter((f: File) => f.id !== file.id);
-                                    addFileToProject(project.id, updatedFiles.map(f => ({ ...f, type: (f.type || 'markdown') as File["type"] })));
-                                  }}
-                                  aria-label="Delete"
-                                >
-                                  <span role="img" aria-label="Delete">🗑️</span>
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Delete</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
+            </form>
           </div>
-        ))}
-      </div>
-      {/* Bottom static container for MCP and Timeline */}
-      <div className="px-4 pb-16 pt-2">
-        <hr className="my-2 border-t border-gray-300 dark:border-gray-700" />
-        {/* MCP Section - styled like other sidebar sections */}
-        <div key="mcp" className="mt-2">
-          <div className="flex items-center justify-between mb-1">
-            <button
-              onClick={() => toggle('mcp')}
-              className="text-left font-semibold flex items-center w-full"
-              title="Model Context Protocol"
-            >
-              <span className="mr-2 text-xs">{expanded['mcp'] ? '▼' : '▶'}</span>
-              <span>MCP</span>
-            </button>
-          </div>
-          {expanded['mcp'] && (
-            <ul className="space-y-1">
-              {mcpUpdates.map((update: { id: string; name: string; content: string }) => (
-                <li key={update.id} className="flex items-center pl-2 pr-0 py-1 rounded gap-2 text-xs font-medium">
-                  <span className="flex items-center gap-2 flex-shrink-0">
-                    <MCPStarIcon />
-                  </span>
-                  <button
-                    className="truncate max-w-[140px] flex-1 text-left bg-transparent border-none outline-none cursor-pointer font-medium text-black dark:text-gray-100"
-                    title={update.content}
-                    style={{whiteSpace: 'normal'}}
-                  >
-                    {update.name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
-        {/* Timeline Section - styled like other sidebar sections */}
-        <hr className="my-2 border-t border-gray-300 dark:border-gray-700" />
-        <div key="timeline" className="mt-2">
-          <div className="flex items-center justify-between mb-1">
-            <button
-              onClick={() => toggle('timeline')}
-              className="text-left font-semibold flex items-center w-full"
-            >
-              <span className="mr-2 text-xs">{expanded['timeline'] ? '▼' : '▶'}</span>
-              <span>Timeline</span>
-            </button>
-          </div>
-          {expanded['timeline'] && (
-            <ul className="space-y-1">
-              {grouped['timeline'].map((file: File) => (
-                <li key={file.id} className="flex items-center pl-2 pr-0 py-1 rounded gap-2 text-xs font-medium">
-                  <span className="flex items-center gap-2 flex-shrink-0">
-                    {/* Timeline icon for consistency */}
-                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" style={{ display: 'inline', verticalAlign: 'middle' }}>
-                      <circle cx="10" cy="10" r="8" stroke="#6366f1" strokeWidth="2" fill="#f3f4f6" />
-                      <rect x="9.25" y="5" width="1.5" height="5" rx="0.75" fill="#6366f1" />
-                      <rect x="9.25" y="10" width="1.5" height="3" rx="0.75" fill="#6366f1" />
-                    </svg>
-                  </span>
-                  <button
-                    onClick={() => setCurrentFile(file)}
-                    className={`truncate max-w-[140px] flex-1 text-left bg-transparent border-none outline-none cursor-pointer ${
-                      currentFile?.id === file.id
-                        ? 'font-bold text-blue-700 dark:text-blue-400'
-                        : 'font-medium text-black dark:text-gray-100'
-                    }`}
-                    title={file.mandatory ? 'Mandatory to close a deal' : ''}
-                  >
-                    {file.name}
-                    {file.mandatory && <span className="text-red-500 ml-1">*</span>}
-                  </button>
+      )}
+      {/* Accounts List */}
+      <div className="flex-1 overflow-y-auto bg-[#444444] p-2">
+        <div className="bg-white rounded-lg shadow p-2 flex flex-col h-full">
+          {filteredAccounts.length === 0 ? (
+            <div className="text-gray-400 text-sm mt-8 text-center">No accounts found.</div>
+          ) : (
+            <ul className="space-y-2 flex-1 overflow-y-auto">
+              {filteredAccounts.map((account) => (
+                <li
+                  key={account.id}
+                  className={`flex items-center gap-3 p-3 rounded cursor-pointer transition-colors border border-transparent hover:bg-blue-100 text-gray-900 bg-gray-50 ${selectedAccountId === account.id ? 'bg-blue-100 border-yellow-400' : ''}`}
+                  onClick={() => onSelect(account)}
+                >
+                  {account.logoUrl ? (
+                    <img src={account.logoUrl} alt={account.name} className="w-8 h-8 rounded-full bg-white object-cover" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-yellow-600 flex items-center justify-center font-bold text-[#444444] text-lg">
+                      {getInitials(account.name)}
+                    </div>
+                  )}
+                  <span className="font-semibold truncate">{account.name}</span>
                 </li>
               ))}
             </ul>
           )}
         </div>
       </div>
-      {addModal.section && (
-        <AddFileModal
-          open={addModal.open}
-          section={addModal.section}
-          onClose={() => setAddModal({ open: false, section: null })}
-          onAdd={(file) => {
-            if (project?.id) addFileToProject(project.id, [file]);
-            setAddModal({ open: false, section: null });
-          }}
-        />
+      {/* Show Default Project Button */}
+      {typeof showDefault !== 'undefined' && typeof onShowDefault === 'function' && (
+        <div className="p-3">
+          <button
+            className="px-3 py-1 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 text-sm w-full"
+            onClick={() => onShowDefault(!showDefault)}
+          >
+            {showDefault ? 'Hide Default Project' : 'Show Default Project'}
+          </button>
+        </div>
       )}
     </div>
   );

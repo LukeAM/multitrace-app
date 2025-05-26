@@ -4,7 +4,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 export const metadata = {
-  title: 'Cursor for Sales',
+  title: 'Multitrace.ai',
   description: 'IDE-style sales assistant',
 };
 

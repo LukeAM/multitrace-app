@@ -1,6 +1,6 @@
 'use client';
 import { useAppStore } from '@/lib/store';
-import { FileIcon, FolderIcon, ChevronRightIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
+import { DocumentIcon, FolderIcon, ChevronRightIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 
 interface FileNode {
@@ -57,7 +57,7 @@ export default function FileTree() {
               <FolderIcon className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400 theme-monokai:text-[#F8F8F2] theme-greenonblack:text-[#00FF00]" />
             </>
           ) : (
-            <FileIcon className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400 theme-monokai:text-[#F8F8F2] theme-greenonblack:text-[#00FF00]" />
+            <DocumentIcon className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400 theme-monokai:text-[#F8F8F2] theme-greenonblack:text-[#00FF00]" />
           )}
           <span className="truncate">{node.name}</span>
         </div>

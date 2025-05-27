@@ -20,3 +20,4 @@ yarn-error.log*
 
 # Misc
 output.html
+.vercel

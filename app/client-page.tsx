@@ -1,9 +1,10 @@
 "use client";
 
+import { useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
+import { getToken } from '@clerk/nextjs/server';
 import { useClerkSupabaseAuth } from '@/lib/supabaseClient';
 import { useAppStore } from '@/lib/store';
-import { useEffect, useState } from 'react';
 
 import Sidebar from '@/components/Sidebar';
 import Editor from '@/components/Editor';
@@ -16,26 +17,23 @@ import DealSummaryDashboard from '@/components/DealSummaryDashboard';
 import DashboardShell from '@/components/DashboardShell';
 import OpportunitiesList from '@/components/OpportunitiesList';
 import OpportunityDetails from '@/components/OpportunityDetails';
-import { supabase } from '@/lib/supabaseClient';
 import LegacyDemoProject from '@/components/LegacyDemoProject';
 import LegacySidebar from '@/components/LegacySidebar';
 
-// MAIN ENTRY: Safe hydration-aware wrapper
 export default function ClientPage() {
   const { isLoaded, isSignedIn } = useAuth();
 
   if (!isLoaded) return null;
-  if (!isSignedIn) return <div>Redirecting...</div>; // Optional: Add redirect logic
+  if (!isSignedIn) return <div>Redirecting...</div>;
 
   return <ClientPageInner />;
 }
 
-// MAIN UI LOGIC: Your full editor/dashboard app
 function ClientPageInner() {
   const supabase = useClerkSupabaseAuth();
+  const { isLoaded, isSignedIn } = useAuth();
   const { currentFile } = useAppStore();
 
-  // — state and useEffects unchanged from your current version —
   const [visible, setVisible] = useState({ sidebar: true, copilot: true, dashboard: false });
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,13 +48,82 @@ function ClientPageInner() {
   const [teams, setTeams] = useState<Array<{ team_id: string }>>([]);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
 
-  // — all useEffects unchanged, just copy from your current file —
-  // Including: setupInitialProject, fetchProjects, fetchTeams, fetchAccounts, fetchOpportunities
+  // 👇 Inject Supabase session via Clerk token
+  useEffect(() => {
+    const setSession = async () => {
+      if (!isLoaded || !isSignedIn) return;
+      const token = await getToken({ template: 'supabase' });
+      if (!token) return;
 
-  // ... render loading state
+      const { error } = await supabase.auth.setSession({
+        access_token: token,
+        refresh_token: token,
+      });
+
+      if (error) console.error('Supabase session error:', error);
+    };
+
+    setSession();
+  }, [isLoaded, isSignedIn, supabase]);
+
+  // Fetch projects
+  useEffect(() => {
+    const fetchProjects = async () => {
+      setLoading(true);
+      const { data, error } = await supabase.from('projects').select('*, files(*)');
+      if (error) {
+        console.error(error);
+        setLoading(false);
+        return;
+      }
+      setProjects(data || []);
+      setLoading(false);
+    };
+
+    fetchProjects();
+  }, [supabase]);
+
+  // Fetch teams
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+
+    const fetchTeams = async () => {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user?.id) return;
+
+      const { data } = await supabase.from('team_members').select('team_id').eq('user_id', user.id);
+      setTeams(data || []);
+      if (data?.length > 0) setActiveTeamId(data[0].team_id);
+    };
+
+    fetchTeams();
+  }, [isLoaded, isSignedIn, supabase]);
+
+  // Fetch accounts when mainView is 'accounts'
+  useEffect(() => {
+    if (mainView === 'accounts' && teams.length > 0) {
+      supabase
+        .from('accounts')
+        .select('id, name, created_at')
+        .in('team_id', teams.map(t => t.team_id))
+        .then(({ data }) => setAccounts(data || []));
+    }
+  }, [mainView, teams]);
+
+  // Fetch opportunities when an account is selected
+  useEffect(() => {
+    if (selectedAccount) {
+      supabase
+        .from('projects')
+        .select('*')
+        .eq('account_id', selectedAccount.id)
+        .then(({ data }) => setOpportunities(data || []));
+      setMainView('opportunities');
+    }
+  }, [selectedAccount]);
+
   if (loading) return <div>Loading projects…</div>;
 
-  // ... render main layout
   return (
     <ProjectProvider projects={projects}>
       <div className="flex h-screen bg-[#444444]">

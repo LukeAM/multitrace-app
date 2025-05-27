@@ -5,6 +5,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useEffect, useState, ReactNode } from 'react';
 import { Briefcase, Users, BarChart2, UserCog } from 'lucide-react';
+import { useUserTeams } from '@/hooks/useUserTeams';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 
 type Theme = 'light' | 'dark' | 'theme-monokai' | 'theme-greenonblack';
 
@@ -30,6 +32,8 @@ export default function TopBar({
   const [theme, setTheme] = useState<Theme>('light');
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState('opportunities');
+  const { teams, activeTeamId, setActiveTeamId, loading } = useUserTeams();
+  const currentTeam = teams.find(t => t.team_id === activeTeamId);
 
   useEffect(() => {
     setMounted(true);
@@ -50,6 +54,34 @@ export default function TopBar({
       {/* Logo centered horizontally at the top */}
       <div className="flex items-center justify-center w-full mt-4 mb-2">
         <Logo />
+      </div>
+      {/* Team Switcher */}
+      <div className="mr-4">
+        {teams.length <= 1 ? (
+          <span className="text-sm text-yellow-400 font-semibold">
+            {currentTeam ? `Team: ${currentTeam.team_id}` : loading ? 'Loading team...' : 'No team'}
+          </span>
+        ) : (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="text-sm text-yellow-400 font-semibold bg-gray-800 px-3 py-1 rounded hover:bg-yellow-400 hover:text-[#444444] transition">
+                {currentTeam ? `Team: ${currentTeam.team_id}` : 'Select Team'} ▼
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2 bg-white text-gray-900">
+              <div className="font-bold mb-2">Switch Team</div>
+              {teams.map(team => (
+                <button
+                  key={team.team_id}
+                  className={`block w-full text-left px-3 py-2 rounded hover:bg-yellow-100 ${team.team_id === activeTeamId ? 'bg-yellow-200 font-bold' : ''}`}
+                  onClick={() => setActiveTeamId(team.team_id)}
+                >
+                  {team.team_id}
+                </button>
+              ))}
+            </PopoverContent>
+          </Popover>
+        )}
       </div>
       {/* Menu icons */}
       <div className="flex flex-col items-center gap-6 flex-1 mt-2">

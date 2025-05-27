@@ -45,6 +45,9 @@ export default function LegacySidebar({ project, currentFile, setCurrentFile }: 
     master_files: false,
   });
   const [searchTerm, setSearchTerm] = useState('');
+  const [showStakeholders, setShowStakeholders] = useState(false);
+  const [showPocScope, setShowPocScope] = useState(false);
+  const [showBilling, setShowBilling] = useState(false);
 
   // Group files by section
   const grouped = {
@@ -87,11 +90,42 @@ export default function LegacySidebar({ project, currentFile, setCurrentFile }: 
             {/* Quick Stats - stubbed */}
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xs font-semibold text-gray-200">Stakeholders</span>
-              <span className="text-xs text-gray-400 ml-2">3 key contacts</span>
+              <Button size="sm" variant="ghost" onClick={() => setShowStakeholders(true)} className="text-yellow-400 underline text-xs">View</Button>
+              <Popover open={showStakeholders} onOpenChange={setShowStakeholders}>
+                <PopoverContent className="w-72 p-4 bg-white text-gray-900">
+                  <div className="font-bold mb-2">Stakeholders</div>
+                  <div className="text-xs mb-1">Champion: Emily (Head of Data)</div>
+                  <div className="text-xs mb-1">Economic Buyer: Jon (CFO)</div>
+                  <div className="text-xs mb-1">Security: Ana (CISO)</div>
+                  <div className="text-xs mb-1">Procurement: Sergio</div>
+                  <Button size="sm" variant="secondary" onClick={() => setShowStakeholders(false)} className="mt-2">Close</Button>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xs font-semibold text-gray-200">PoC Scope</span>
-              <span className="text-xs text-gray-400 ml-2">5 milestones</span>
+              <Button size="sm" variant="ghost" onClick={() => setShowPocScope(true)} className="text-yellow-400 underline text-xs">View</Button>
+              <Popover open={showPocScope} onOpenChange={setShowPocScope}>
+                <PopoverContent className="w-72 p-4 bg-white text-gray-900">
+                  <div className="font-bold mb-2">PoC Scope</div>
+                  <div className="text-xs mb-1">- 5 milestones</div>
+                  <div className="text-xs mb-1">- Integration with Looker</div>
+                  <div className="text-xs mb-1">- Security review</div>
+                  <Button size="sm" variant="secondary" onClick={() => setShowPocScope(false)} className="mt-2">Close</Button>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-semibold text-gray-200">Billing</span>
+              <Button size="sm" variant="ghost" onClick={() => setShowBilling(true)} className="text-yellow-400 underline text-xs">View</Button>
+              <Popover open={showBilling} onOpenChange={setShowBilling}>
+                <PopoverContent className="w-72 p-4 bg-white text-gray-900">
+                  <div className="font-bold mb-2">Billing Events</div>
+                  <div className="text-xs mb-1">Initial setup invoice: $2,500 (Paid)</div>
+                  <div className="text-xs mb-1">Monthly subscription: $5,000 (Paid)</div>
+                  <Button size="sm" variant="secondary" onClick={() => setShowBilling(false)} className="mt-2">Close</Button>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="border-t border-gray-700 my-2" />
             {/* Recent Activity - stubbed */}
@@ -112,13 +146,14 @@ export default function LegacySidebar({ project, currentFile, setCurrentFile }: 
         )}
         {activeTab === 'timeline' && (
           <div className="p-2">
-            <div className="text-xs text-gray-400 mb-2">Timeline (stubbed)</div>
+            <div className="text-xs text-gray-400 mb-2">Timeline</div>
             <ul className="space-y-2">
               {grouped.timeline.map((file) => (
                 <li
                   key={file.id}
                   className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors border border-transparent hover:bg-blue-900/30 ${currentFile?.id === file.id ? 'bg-blue-900/50 border-yellow-400' : ''}`}
                   onClick={() => setCurrentFile(file)}
+                  title={file.content?.slice(0, 100) || ''}
                 >
                   <FileTypeIcon type={file.type} />
                   <span className="font-semibold text-white truncate">{file.name}</span>

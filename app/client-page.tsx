@@ -92,7 +92,9 @@ function ClientPageInner() {
 
       const { data } = await supabase.from('team_members').select('team_id').eq('user_id', user.id);
       setTeams(data || []);
-      if (data?.length > 0) setActiveTeamId(data[0].team_id);
+      if (Array.isArray(data) && data.length > 0) {
+        setActiveTeamId(data[0].team_id);
+      }
     };
 
     fetchTeams();

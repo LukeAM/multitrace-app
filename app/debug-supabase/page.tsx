@@ -32,3 +32,8 @@ export default function DebugSupabasePage() {
 
   return (
     <main className="p-4">
+      <h1 className="text-lg font-bold">🔍 Supabase Debug</h1>
+      <p>{status}</p>
+    </main>
+  );
+}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
-import { getToken } from '@clerk/nextjs/server';
+import { getToken } from '@clerk/nextjs';
 import { useClerkSupabaseAuth } from '@/lib/supabaseClient';
 import { useAppStore } from '@/lib/store';
 
@@ -12,7 +12,6 @@ import Copilot from '@/components/Copilot';
 import TopBar from '@/components/TopBar';
 import { UserButton } from '@clerk/nextjs';
 import { ProjectProvider } from '@/lib/ProjectContext';
-import { createProjectWithTemplate } from '@/lib/createProjectWithTemplate';
 import DealSummaryDashboard from '@/components/DealSummaryDashboard';
 import DashboardShell from '@/components/DashboardShell';
 import OpportunitiesList from '@/components/OpportunitiesList';

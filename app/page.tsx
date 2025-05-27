@@ -9,5 +9,5 @@ export default async function HomePage() {
     redirect('/sign-in'); // or '/sign-in?redirect_url=/'
   }
 
-  redirect('/client-page'); // or render <ClientPage /> if you prefer
+  return <ClientPage />;
 }

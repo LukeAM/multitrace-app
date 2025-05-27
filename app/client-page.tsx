@@ -1,5 +1,5 @@
 "use client";
-
+import '@clerk/clerk-js';
 import { useEffect, useState } from 'react';
 import { useAuth, useSession, UserButton } from '@clerk/nextjs';
 import { useClerkSupabaseAuth } from '@/lib/supabaseClient';

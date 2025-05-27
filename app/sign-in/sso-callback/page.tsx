@@ -1,16 +1,30 @@
-// app/sign-in/sso-callback/page.tsx
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic"; // Optional: ensures SSR in Vercel edge
+export const dynamic = "force-dynamic";
 
 export default async function SSOCallbackPage() {
   const { userId } = await auth();
 
   if (userId) {
-    redirect("/"); // send them home or wherever you want
+    redirect("/");
   }
 
-  // fallback while waiting
-  return <p>Signing you in...</p>;
+  // If Clerk hasn't populated the session yet
+  return (
+    <html>
+      <body>
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            setTimeout(() => {
+              window.location.href = "/";
+            }, 2000);
+          `
+        }} />
+        <p style={{ fontFamily: "sans-serif", padding: "2rem" }}>
+          Signing you in...
+        </p>
+      </body>
+    </html>
+  );
 }

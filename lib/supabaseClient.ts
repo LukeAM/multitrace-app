@@ -1,25 +1,29 @@
-// lib/supabaseClient.ts
-
+import { useEffect } from 'react';
+import { useAuth } from '@clerk/nextjs';
 import { createBrowserClient } from '@supabase/ssr';
-import { useMemo } from 'react';
-import { useSession } from '@clerk/nextjs';
+
+export const supabase = createBrowserClient(); // ✅ this line is required
 
 export function useClerkSupabaseAuth() {
-  const { session } = useSession();
+  const { getToken, isSignedIn } = useAuth();
 
-  const supabase = useMemo(() => {
-    return createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        global: {
-          headers: {
-            Authorization: session?.id ? `Bearer ${session.id}` : '',
-          },
-        },
+  useEffect(() => {
+    const setSupabaseAuth = async () => {
+      if (isSignedIn) {
+        const token = await getToken({ template: 'supabase' });
+        if (token) {
+          await supabase.auth.setSession({
+            access_token: token,
+            refresh_token: '',
+          });
+        }
+      } else {
+        await supabase.auth.signOut();
       }
-    );
-  }, [session]);
+    };
+
+    setSupabaseAuth();
+  }, [getToken, isSignedIn]);
 
   return supabase;
 }

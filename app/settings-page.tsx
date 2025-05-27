@@ -45,6 +45,8 @@ export default function ClientPage() {
   const [opportunities, setOpportunities] = useState<any[]>([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState<any | null>(null);
   const [showDefault, setShowDefault] = useState(false);
+  const [teams, setTeams] = useState<Array<{ team_id: string }>>([]);
+  const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -65,11 +67,30 @@ export default function ClientPage() {
 
       if (existingProjects.length === 0) {
         console.log('Creating default project…');
-        await createProjectWithTemplate(supabase, 'Getting Started Project', user.id, 'demo-team-id');
+        if (activeTeamId) {
+          await createProjectWithTemplate(supabase, 'Getting Started Project', user.id, activeTeamId);
+        } else {
+          console.error('No active team ID for project creation');
+        }
       }
     };
 
     setupInitialProject();
+  }, [isLoaded, isSignedIn, supabase]);
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    async function fetchTeams() {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user?.id) return;
+      const { data } = await supabase
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', user.id);
+      setTeams(data || []);
+      if (data && data.length > 0) setActiveTeamId(data[0].team_id);
+    }
+    fetchTeams();
   }, [isLoaded, isSignedIn, supabase]);
 
   // Fetch accounts when mainView is 'accounts'

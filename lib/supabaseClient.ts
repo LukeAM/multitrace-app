@@ -1,29 +1,25 @@
-import { useEffect } from 'react';
-import { useAuth } from '@clerk/nextjs';
-import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
+// lib/supabaseClient.ts
 
-export const supabase = createPagesBrowserClient();
+import { createBrowserClient } from '@supabase/ssr';
+import { useMemo } from 'react';
+import { useSession } from '@clerk/nextjs';
 
 export function useClerkSupabaseAuth() {
-  const { getToken, isSignedIn } = useAuth();
+  const { session } = useSession();
 
-  useEffect(() => {
-    const setSupabaseAuth = async () => {
-      if (isSignedIn) {
-        const token = await getToken({ template: 'supabase' }); // 👈 THIS MUST MATCH YOUR Clerk JWT template name
-        if (token) {
-          await supabase.auth.setSession({
-            access_token: token,
-            refresh_token: '', // Not needed for Clerk
-          });
-        }
-      } else {
-        await supabase.auth.signOut();
+  const supabase = useMemo(() => {
+    return createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: {
+            Authorization: session?.id ? `Bearer ${session.id}` : '',
+          },
+        },
       }
-    };
-
-    setSupabaseAuth();
-  }, [getToken, isSignedIn]);
+    );
+  }, [session]);
 
   return supabase;
 }

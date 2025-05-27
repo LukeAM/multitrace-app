@@ -46,11 +46,12 @@ function ClientPageInner() {
   const [teams, setTeams] = useState<Array<{ team_id: string }>>([]);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
 
-  // 👇 Inject Supabase session via Clerk token
+  // ✅ Supabase session injection
   useEffect(() => {
     const setSession = async () => {
       if (!isLoaded || !isSignedIn) return;
-      const token = await getToken({ template: 'supabase' });
+
+      const token = await window.Clerk?.session?.getToken({ template: 'supabase' });
       if (!token) return;
 
       const { error } = await supabase.auth.setSession({

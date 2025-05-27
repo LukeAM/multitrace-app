@@ -69,7 +69,7 @@ export default function ClientPage() {
   const [opportunities, setOpportunities] = useState<any[]>([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState<any | null>(null);
   const [showDefault, setShowDefault] = useState(false);
-  const [teams, setTeams] = useState([]);
+  const [teams, setTeams] = useState<Array<{ team_id: string }>>([]);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -91,7 +91,11 @@ export default function ClientPage() {
 
       if (existingProjects.length === 0) {
         console.log('Creating default project…');
-        await createProjectWithTemplate(supabase, 'Getting Started Project', user.id, 'demo-team-id');
+        if (activeTeamId) {
+          await createProjectWithTemplate(supabase, 'Getting Started Project', user.id, activeTeamId);
+        } else {
+          console.error('No active team ID for project creation');
+        }
       }
     };
 
@@ -222,27 +226,38 @@ export default function ClientPage() {
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
-    supabase
-      .from('team_members')
-      .select('team_id')
-      .eq('user_id', (await supabase.auth.getUser()).data.user.id)
-      .then(({ data }) => {
-        setTeams(data || []);
-        if (data && data.length > 0) setActiveTeamId(data[0].team_id);
-      });
+    async function fetchTeams() {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user?.id) return;
+      const { data } = await supabase
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', user.id);
+      setTeams(data || []);
+      if (data && data.length > 0) setActiveTeamId(data[0].team_id);
+    }
+    fetchTeams();
   }, [isLoaded, isSignedIn, supabase]);
 
   // Fetch accounts when mainView is 'accounts'
   useEffect(() => {
-    if (mainView === 'accounts') {
-      supabase.from('accounts').select('id, name, created_at').then(({ data }) => setAccounts(data || []));
+    if (mainView === 'accounts' && teams.length > 0) {
+      supabase
+        .from('accounts')
+        .select('id, name, created_at')
+        .in('team_id', teams.map(t => t.team_id))
+        .then(({ data }) => setAccounts(data || []));
     }
-  }, [mainView]);
+  }, [mainView, teams]);
 
   // Fetch opportunities when an account is selected
   useEffect(() => {
     if (selectedAccount) {
-      supabase.from('projects').select('*').eq('account_id', selectedAccount.id).then(({ data }) => setOpportunities(data || []));
+      supabase
+        .from('projects')
+        .select('*')
+        .eq('account_id', selectedAccount.id)
+        .then(({ data }) => setOpportunities(data || []));
       setMainView('opportunities');
     }
   }, [selectedAccount]);

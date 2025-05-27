@@ -663,7 +663,7 @@ export default function Sidebar({ accounts, onSelect, selectedAccountId, onAccou
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { user, isLoaded } = useUser();
-  const [teams, setTeams] = useState([]);
+  const [teams, setTeams] = useState<Array<{ team_id: string }>>([]);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
 
   useEffect(() => {

@@ -1,18 +1,13 @@
+// app/page.tsx
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 
-export default async function Home() {
+export default async function HomePage() {
   const { userId } = auth();
 
-  // SSR-safe: redirect if not signed in
   if (!userId) {
-    redirect('/sign-in');
+    redirect('/sign-in'); // or '/sign-in?redirect_url=/'
   }
 
-  return (
-    <main className="p-4">
-      <h1>Welcome back 👋</h1>
-      <p>You’re signed in as user: {userId}</p>
-    </main>
-  );
+  redirect('/client-page'); // or render <ClientPage /> if you prefer
 }

@@ -49,21 +49,26 @@ function ClientPageInner() {
   // Inject Supabase session via Clerk token
   useEffect(() => {
     const setSession = async () => {
-      if (!isLoaded || !isSignedIn || !session) return;
-
-      const token = await session.getToken({ template: 'supabase' });
-      if (!token) return;
-
+      if (!isLoaded || !isSignedIn) return;
+  
+      const token = await window.Clerk?.session?.getToken({ template: 'supabase' });
+      if (!token) {
+        console.warn('No Clerk token found');
+        return;
+      }
+  
       const { error } = await supabase.auth.setSession({
         access_token: token,
-        refresh_token: token,
+        refresh_token: token, // optional but safe to include
       });
-
-      if (error) console.error('Supabase session error:', error);
+  
+      if (error) console.error('❌ Supabase session error:', error);
+      else console.log('✅ Supabase session set');
     };
-
+  
     setSession();
-  }, [isLoaded, isSignedIn, session, supabase]);
+  }, [isLoaded, isSignedIn, supabase]);
+  
 
   // Fetch projects
   useEffect(() => {

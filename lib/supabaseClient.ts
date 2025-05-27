@@ -1,4 +1,3 @@
-// lib/supabaseClient.ts
 import { useEffect } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
@@ -13,10 +12,7 @@ export function useClerkSupabaseAuth() {
       if (isSignedIn) {
         const token = await getToken({ template: 'supabase' });
         if (token) {
-          await supabase.auth.setSession({
-            access_token: token,
-            refresh_token: '', // Required param, but not used
-          });
+          await supabase.auth.setSession({ access_token: token, refresh_token: '' });
         }
       } else {
         await supabase.auth.signOut();

@@ -1,4 +1,4 @@
-// middleware.ts (Clerk v4 fallback)
+// middleware.ts
 import { withClerkMiddleware } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 

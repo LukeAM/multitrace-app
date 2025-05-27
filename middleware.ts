@@ -1,10 +1,9 @@
 // middleware.ts
-import { withClerkMiddleware } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
-export default withClerkMiddleware(() => {
+export function middleware() {
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: ['/((?!_next|.*\\..*).*)'],

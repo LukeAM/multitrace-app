@@ -1,20 +1,34 @@
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
+'use client';
 
-export const dynamic = "force-dynamic";
+import { useEffect, useState } from 'react';
+import { useAuth } from '@clerk/nextjs';
+import { supabase } from '@/lib/supabaseClient';
 
-export default async function DebugSupabasePage() {
-  const supabase = createServerComponentClient({ cookies });
-  const { data: user, error } = await supabase.auth.getUser();
+export default function DebugSupabasePage() {
+  const { getToken, isSignedIn } = useAuth();
+  const [status, setStatus] = useState('Checking session...');
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const token = await getToken({ template: 'supabase' });
+
+      console.log('🪪 Clerk Token:', token);
+
+      const { data, error } = await supabase.auth.getSession();
+
+      console.log('📦 Supabase Session:', data, error);
+
+      if (error) {
+        setStatus(`❌ Supabase Error: ${error.message}`);
+      } else if (!data.session) {
+        setStatus('⚠️ No Supabase session found.');
+      } else {
+        setStatus(`✅ Supabase user: ${data.session.user.email}`);
+      }
+    };
+
+    checkSession();
+  }, [getToken, isSignedIn]);
 
   return (
-    <div className="p-8">
-      <h1 className="text-xl font-bold mb-4">🔍 Supabase User Debug</h1>
-      {error ? (
-        <pre className="text-red-600">Error: {JSON.stringify(error, null, 2)}</pre>
-      ) : (
-        <pre className="text-green-700">{JSON.stringify(user, null, 2)}</pre>
-      )}
-    </div>
-  );
-}
+    <main className="p-4">

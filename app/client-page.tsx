@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useAuth } from '@clerk/nextjs';
+import { useAuth, useSession, UserButton } from '@clerk/nextjs';
 import { useClerkSupabaseAuth } from '@/lib/supabaseClient';
 import { useAppStore } from '@/lib/store';
 
@@ -9,7 +9,6 @@ import Sidebar from '@/components/Sidebar';
 import Editor from '@/components/Editor';
 import Copilot from '@/components/Copilot';
 import TopBar from '@/components/TopBar';
-import { UserButton } from '@clerk/nextjs';
 import { ProjectProvider } from '@/lib/ProjectContext';
 import DealSummaryDashboard from '@/components/DealSummaryDashboard';
 import DashboardShell from '@/components/DashboardShell';
@@ -30,6 +29,7 @@ export default function ClientPage() {
 function ClientPageInner() {
   const supabase = useClerkSupabaseAuth();
   const { isLoaded, isSignedIn } = useAuth();
+  const { session } = useSession();
   const { currentFile } = useAppStore();
 
   const [visible, setVisible] = useState({ sidebar: true, copilot: true, dashboard: false });
@@ -46,12 +46,12 @@ function ClientPageInner() {
   const [teams, setTeams] = useState<Array<{ team_id: string }>>([]);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
 
-  // ✅ Supabase session injection
+  // Inject Supabase session via Clerk token
   useEffect(() => {
     const setSession = async () => {
-      if (!isLoaded || !isSignedIn) return;
+      if (!isLoaded || !isSignedIn || !session) return;
 
-      const token = await window.Clerk?.session?.getToken({ template: 'supabase' });
+      const token = await session.getToken({ template: 'supabase' });
       if (!token) return;
 
       const { error } = await supabase.auth.setSession({
@@ -63,7 +63,7 @@ function ClientPageInner() {
     };
 
     setSession();
-  }, [isLoaded, isSignedIn, supabase]);
+  }, [isLoaded, isSignedIn, session, supabase]);
 
   // Fetch projects
   useEffect(() => {

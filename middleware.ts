@@ -1,10 +1,16 @@
 // middleware.ts
-import { NextResponse } from 'next/server';
+import { authMiddleware } from '@clerk/nextjs/server';
 
-export function middleware() {
-  return NextResponse.next();
-}
+export default authMiddleware({
+  publicRoutes: [
+    '/sign-in',
+    '/sign-up',
+    '/sso-callback',
+    '/debug-supabase',
+    '/favicon.ico',
+  ],
+});
 
 export const config = {
-  matcher: ['/((?!_next|.*\\..*).*)'],
+  matcher: ['/((?!_next|.*\\..*).*)'], // all routes except static files
 };

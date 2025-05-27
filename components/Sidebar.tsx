@@ -663,7 +663,20 @@ export default function Sidebar({ accounts, onSelect, selectedAccountId, onAccou
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { user, isLoaded } = useUser();
-  const teamId = user?.publicMetadata?.team_id;
+  const [teams, setTeams] = useState([]);
+  const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    useClerkSupabaseAuth()
+      .from('team_members')
+      .select('team_id')
+      .eq('user_id', user.id)
+      .then(({ data }) => {
+        setTeams(data || []);
+        if (data && data.length > 0) setActiveTeamId(data[0].team_id);
+      });
+  }, [user?.id]);
 
   const filteredAccounts = accounts.filter(
     (acc) => acc.type === activeFilter
@@ -673,15 +686,15 @@ export default function Sidebar({ accounts, onSelect, selectedAccountId, onAccou
     e.preventDefault();
     setLoading(true);
     setError(null);
-    if (!teamId) {
-      setError('No team ID found for user.');
+    if (!activeTeamId) {
+      setError('No team selected.');
       setLoading(false);
       return;
     }
     try {
       const { data, error } = await useClerkSupabaseAuth()
         .from('accounts')
-        .insert([{ name: accountName, team_id: teamId }])
+        .insert([{ name: accountName, team_id: activeTeamId }])
         .select();
       if (error) throw error;
       setAccountName('');
@@ -719,8 +732,8 @@ export default function Sidebar({ accounts, onSelect, selectedAccountId, onAccou
         <button
           className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-semibold w-full"
           onClick={() => setShowForm(true)}
-          disabled={!isLoaded || !teamId}
-          title={!isLoaded ? 'Loading user...' : !teamId ? 'No team ID found for user' : ''}
+          disabled={!isLoaded || !activeTeamId}
+          title={!isLoaded ? 'Loading user...' : !activeTeamId ? 'No team selected' : ''}
         >
           + Create Account
         </button>
@@ -738,14 +751,14 @@ export default function Sidebar({ accounts, onSelect, selectedAccountId, onAccou
                 placeholder="Account name"
                 className="border border-gray-300 rounded px-2 py-1 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
                 required
-                disabled={loading || !teamId}
+                disabled={loading || !activeTeamId}
               />
               {error && <span className="text-xs text-red-600">{error}</span>}
               <div className="flex gap-2 mt-2">
                 <button
                   type="submit"
                   className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
-                  disabled={loading || !accountName.trim() || !teamId}
+                  disabled={loading || !accountName.trim() || !activeTeamId}
                 >
                   {loading ? 'Creating...' : 'Create'}
                 </button>

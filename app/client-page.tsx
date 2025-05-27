@@ -69,6 +69,8 @@ export default function ClientPage() {
   const [opportunities, setOpportunities] = useState<any[]>([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState<any | null>(null);
   const [showDefault, setShowDefault] = useState(false);
+  const [teams, setTeams] = useState([]);
+  const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -217,6 +219,18 @@ export default function ClientPage() {
     };
     fetchProjects();
   }, [supabase]);
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    supabase
+      .from('team_members')
+      .select('team_id')
+      .eq('user_id', (await supabase.auth.getUser()).data.user.id)
+      .then(({ data }) => {
+        setTeams(data || []);
+        if (data && data.length > 0) setActiveTeamId(data[0].team_id);
+      });
+  }, [isLoaded, isSignedIn, supabase]);
 
   // Fetch accounts when mainView is 'accounts'
   useEffect(() => {

@@ -28,7 +28,7 @@ export async function createProjectWithTemplate(
   supabase: any,
   projectName: string,
   userId: string,
-  teamId: string
+  activeTeamId: string
 ) {
   // Step 1: Create project
   const { data: projectData, error: projectError } = await supabase
@@ -37,7 +37,7 @@ export async function createProjectWithTemplate(
       {
         name: projectName,
         owner_id: userId,
-        team_id: teamId,
+        team_id: activeTeamId,
       },
     ])
     .select()

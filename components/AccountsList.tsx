@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useUser } from '@clerk/nextjs';
 import LegacyDemoProject from './LegacyDemoProject';
@@ -35,21 +35,34 @@ export default function AccountsList({ accounts, onSelect, onAccountCreated, sid
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { user, isLoaded } = useUser();
-  const teamId = user?.publicMetadata?.team_id;
+  const [teams, setTeams] = useState([]);
+  const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from('team_members')
+      .select('team_id')
+      .eq('user_id', user.id)
+      .then(({ data }) => {
+        setTeams(data || []);
+        if (data && data.length > 0) setActiveTeamId(data[0].team_id);
+      });
+  }, [user?.id]);
 
   async function handleCreateAccount(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    if (!teamId) {
-      setError('No team ID found for user.');
+    if (!activeTeamId) {
+      setError('No team selected.');
       setLoading(false);
       return;
     }
     try {
       const { data, error } = await supabase
         .from('accounts')
-        .insert([{ name: accountName, team_id: teamId }])
+        .insert([{ name: accountName, team_id: activeTeamId }])
         .select();
       if (error) throw error;
       setAccountName('');
@@ -72,8 +85,8 @@ export default function AccountsList({ accounts, onSelect, onAccountCreated, sid
               <button
                 className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
                 onClick={() => setShowForm((v) => !v)}
-                disabled={!isLoaded || !teamId}
-                title={!isLoaded ? 'Loading user...' : !teamId ? 'No team ID found for user' : ''}
+                disabled={!isLoaded || !activeTeamId}
+                title={!isLoaded ? 'Loading user...' : !activeTeamId ? 'No team selected' : ''}
               >
                 + Create Account
               </button>
@@ -94,12 +107,12 @@ export default function AccountsList({ accounts, onSelect, onAccountCreated, sid
                 placeholder="Account name"
                 className="border border-gray-300 rounded px-2 py-1 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
                 required
-                disabled={loading || !teamId}
+                disabled={loading || !activeTeamId}
               />
               <button
                 type="submit"
                 className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
-                disabled={loading || !accountName.trim() || !teamId}
+                disabled={loading || !accountName.trim() || !activeTeamId}
               >
                 {loading ? 'Creating...' : 'Create'}
               </button>

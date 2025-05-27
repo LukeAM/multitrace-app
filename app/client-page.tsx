@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useAuth, useSession, UserButton } from '@clerk/nextjs';
 import { useClerkSupabaseAuth } from '@/lib/supabaseClient';
 import { useAppStore } from '@/lib/store';
-
 import Sidebar from '@/components/Sidebar';
 import Editor from '@/components/Editor';
 import Copilot from '@/components/Copilot';
@@ -49,25 +48,21 @@ function ClientPageInner() {
   // Inject Supabase session via Clerk token
   useEffect(() => {
     const setSession = async () => {
-      if (!isLoaded || !isSignedIn) return;
+      if (!isLoaded || !isSignedIn || !session) return;
   
-      const token = await window.Clerk?.session?.getToken({ template: 'supabase' });
-      if (!token) {
-        console.warn('No Clerk token found');
-        return;
-      }
+      const token = await session.getToken({ template: 'supabase' });
+      if (!token) return;
   
       const { error } = await supabase.auth.setSession({
         access_token: token,
-        refresh_token: token, // optional but safe to include
+        refresh_token: token,
       });
   
-      if (error) console.error('❌ Supabase session error:', error);
-      else console.log('✅ Supabase session set');
+      if (error) console.error('Supabase session error:', error);
     };
   
     setSession();
-  }, [isLoaded, isSignedIn, supabase]);
+  }, [isLoaded, isSignedIn, session, supabase]);
   
 
   // Fetch projects

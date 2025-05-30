@@ -12,6 +12,7 @@ import { Copy, Trash2, Save, Settings, X, CornerDownLeft, ArrowDown, File, Files
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import CopilotSettings, { CopilotSettings as CopilotSettingsType } from './CopilotSettings';
 
 interface CopilotProps {
   legacy?: boolean;
@@ -37,6 +38,11 @@ export default function Copilot({ legacy }: CopilotProps) {
   const [copilotTab, setCopilotTab] = useState<'private' | 'discovery'>('private');
   const [error, setError] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [settings, setSettings] = useState<CopilotSettingsType>({
+    endpoint: 'default',
+    customApiUrl: '',
+    customApiKey: ''
+  });
 
   useEffect(() => {
     if (contextMode === 'subset' && currentFile) {
@@ -54,6 +60,25 @@ export default function Copilot({ legacy }: CopilotProps) {
     else if (html.classList.contains('theme-monokai')) setTheme('monokai');
     else if (html.classList.contains('dark')) setTheme('dark');
     else setTheme('light');
+  }, []);
+
+  // Load settings from localStorage on mount
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('copilotSettings');
+    if (savedSettings) {
+      try {
+        const parsed = JSON.parse(savedSettings);
+        if (parsed.endpoint && (parsed.endpoint === 'default' || parsed.endpoint === 'custom')) {
+          setSettings({
+            endpoint: parsed.endpoint,
+            customApiUrl: parsed.customApiUrl || '',
+            customApiKey: parsed.customApiKey || ''
+          });
+        }
+      } catch (e) {
+        console.error('Failed to parse saved settings:', e);
+      }
+    }
   }, []);
 
   // Scroll to bottom on new messages
@@ -179,9 +204,26 @@ export default function Copilot({ legacy }: CopilotProps) {
     setMessages(prev => [...prev, { role: 'ai', text: '' }]);
 
     try {
-      const res = await fetch('/api/copilot', {
+      let endpoint = '/api/copilot';
+      let body: any = { prompt: input, context };
+
+      // Use custom endpoint if configured
+      if (settings.endpoint === 'custom') {
+        if (!settings.customApiUrl) {
+          throw new Error('Custom API URL is not configured');
+        }
+        
+        endpoint = '/api/copilot/custom';
+        body = {
+          ...body,
+          apiKey: settings.customApiKey,
+          apiUrl: settings.customApiUrl
+        };
+      }
+
+      const res = await fetch(endpoint, {
         method: 'POST',
-        body: JSON.stringify({ prompt: input, context }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
@@ -212,7 +254,7 @@ export default function Copilot({ legacy }: CopilotProps) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       toast({
         title: "Error",
-        description: "Failed to get response from Copilot",
+        description: err instanceof Error ? err.message : "Failed to get response from Copilot",
         variant: "destructive",
       });
     } finally {
@@ -332,18 +374,21 @@ export default function Copilot({ legacy }: CopilotProps) {
       {/* Header/Toolbar */}
       <div className="flex flex-row items-center justify-between px-6 py-4 h-[64px] bg-blue-50 dark:bg-blue-950/30 border-b border-blue-100 dark:border-blue-900/40 border-t-2 border-blue-700">
         <span className="font-bold text-lg text-blue-900 dark:text-blue-100 tracking-tight">{accountName} Copilot</span>
-        <div className="relative">
-          <select
-            className="bg-transparent border border-blue-200 dark:border-blue-900 rounded px-2 py-1 text-blue-900 dark:text-blue-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-300 transition pr-6 appearance-none"
-            defaultValue="auto"
-          >
-            <option value="auto">auto</option>
-            <option value="openai">OpenAI</option>
-            <option value="anthropic">Anthropic</option>
-          </select>
-          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-blue-400 dark:text-blue-200">
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 8L10 12L14 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          </span>
+        <div className="flex items-center gap-2">
+          <CopilotSettings onSettingsChange={setSettings} />
+          <div className="relative">
+            <select
+              className="bg-transparent border border-blue-200 dark:border-blue-900 rounded px-2 py-1 text-blue-900 dark:text-blue-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-300 transition pr-6 appearance-none"
+              defaultValue="auto"
+            >
+              <option value="auto">auto</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+            </select>
+            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-blue-400 dark:text-blue-200">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 8L10 12L14 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </span>
+          </div>
         </div>
       </div>
       {/* Context info below header */}

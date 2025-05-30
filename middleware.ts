@@ -1,12 +1,7 @@
-import { authMiddleware } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { authMiddleware } from '@clerk/nextjs/server';
 
 export default authMiddleware({
-  publicRoutes: ["/debug-supabase", "/sign-in", "/favicon.ico"],
-  afterAuth(auth, req) {
-    console.log("[middleware] Running for:", req.nextUrl.pathname);
-    return NextResponse.next();
-  }
+  publicRoutes: ['/sign-in', '/sign-up'],
 });
 
 export const config = {

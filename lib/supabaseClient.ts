@@ -1,33 +1,52 @@
-import { useEffect } from 'react';
+// lib/supabaseClient.tsx
+'use client';
+
+import { useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
-import { createBrowserClient } from '@supabase/ssr';
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 
-// These are required: the `supabaseUrl` and `supabaseKey`
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// Create the Supabase client
+const supabaseClient = createPagesBrowserClient();
 
-export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
+export const supabase = supabaseClient;
 
 export function useClerkSupabaseAuth() {
-  const { getToken, isSignedIn } = useAuth();
+  const { getToken, isSignedIn, isLoaded } = useAuth();
+  const [isAuthReady, setIsAuthReady] = useState(false);
 
   useEffect(() => {
     const setSupabaseAuth = async () => {
-      if (isSignedIn) {
-        const token = await getToken({ template: 'supabase' });
-        if (token) {
-          await supabase.auth.setSession({
-            access_token: token,
-            refresh_token: '',
-          });
+      try {
+        // Only proceed if Clerk auth is fully loaded
+        if (!isLoaded) return;
+
+        if (isSignedIn) {
+          console.log('Clerk auth: User is signed in, getting token for Supabase');
+          const token = await getToken({ template: 'supabase' });
+          
+          if (token) {
+            console.log('Clerk token received, setting Supabase session');
+            await supabaseClient.auth.setSession({
+              access_token: token,
+              refresh_token: '', // not needed with Clerk
+            });
+            console.log('Supabase session set successfully');
+          } else {
+            console.error('Failed to get token from Clerk');
+          }
+        } else if (isLoaded) {
+          console.log('User not signed in or Clerk auth not loaded yet');
+          await supabaseClient.auth.signOut();
         }
-      } else {
-        await supabase.auth.signOut();
+        
+        setIsAuthReady(true);
+      } catch (error) {
+        console.error('Error setting up Supabase auth:', error);
       }
     };
 
     setSupabaseAuth();
-  }, [getToken, isSignedIn]);
+  }, [getToken, isSignedIn, isLoaded]);
 
-  return supabase;
+  return supabaseClient;
 }

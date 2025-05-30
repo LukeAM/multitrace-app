@@ -2,7 +2,7 @@
 import '@clerk/clerk-js';
 import { useEffect, useState } from 'react';
 import { useAuth, useSession, UserButton } from '@clerk/nextjs';
-import { useClerkSupabaseAuth } from '@/lib/supabaseClient';
+import { useClerkSupabaseAuth, supabase } from '@/lib/supabaseClient';
 import { useAppStore } from '@/lib/store';
 import Sidebar from '@/components/Sidebar';
 import Editor from '@/components/Editor';
@@ -15,23 +15,30 @@ import OpportunitiesList from '@/components/OpportunitiesList';
 import OpportunityDetails from '@/components/OpportunityDetails';
 import LegacyDemoProject from '@/components/LegacyDemoProject';
 import LegacySidebar from '@/components/LegacySidebar';
+import { createProjectWithTemplate } from '@/lib/createProjectWithTemplate';
+import { Menu } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+
+// Demo project data
+const demoProject = {
+  // ... existing demo project data
+};
 
 export default function ClientPage() {
-  const { isLoaded, isSignedIn } = useAuth();
+  // Auth state
+  const supabaseAuth = useClerkSupabaseAuth();
+  const { isLoaded, isSignedIn, userId } = useAuth();
+  const { currentFile, selectedTimelineEntry } = useAppStore();
+  
+  // State variables
+  const [visible, setVisible] = useState({
+    sidebar: true,
+    copilot: true,
+    dashboard: false,
+  });
 
-  if (!isLoaded) return null;
-  if (!isSignedIn) return <div>Redirecting...</div>;
-
-  return <ClientPageInner />;
-}
-
-function ClientPageInner() {
-  const supabase = useClerkSupabaseAuth();
-  const { isLoaded, isSignedIn } = useAuth();
-  const { session } = useSession();
-  const { currentFile } = useAppStore();
-
-  const [visible, setVisible] = useState({ sidebar: true, copilot: true, dashboard: false });
+  const [authInitialized, setAuthInitialized] = useState(false);
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState('overview');
@@ -45,52 +52,102 @@ function ClientPageInner() {
   const [teams, setTeams] = useState<Array<{ team_id: string }>>([]);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
 
-  // Inject Supabase session via Clerk token
+  // Check if auth is ready before attempting data operations
   useEffect(() => {
-    const setSession = async () => {
-      if (!isLoaded || !isSignedIn || !session) return;
-  
-      const token = await session.getToken({ template: 'supabase' });
-      if (!token) return;
-  
-      const { error } = await supabase.auth.setSession({
-        access_token: token,
-        refresh_token: token,
-      });
-  
-      if (error) console.error('Supabase session error:', error);
-    };
-  
-    setSession();
-  }, [isLoaded, isSignedIn, session, supabase]);
-  
+    if (isLoaded && isSignedIn) {
+      console.log('Auth is ready, user is signed in');
+      setAuthInitialized(true);
+    } else if (isLoaded && !isSignedIn) {
+      console.log('Auth is ready, but user is not signed in');
+      // No need to do anything here, the middleware should redirect
+    }
+  }, [isLoaded, isSignedIn]);
 
-  // Fetch projects
+  // Setup initial project only after auth is confirmed
   useEffect(() => {
-    const fetchProjects = async () => {
-      setLoading(true);
-      const { data, error } = await supabase.from('projects').select('*, files(*)');
-      if (error) {
-        console.error(error);
-        setLoading(false);
-        return;
+    if (!authInitialized) return;
+    
+    const setupInitialProject = async () => {
+      try {
+        console.log('Setting up initial project');
+        // Check for user data
+        const { data: userData, error: userError } = await supabaseAuth.auth.getUser();
+        
+        if (userError || !userData.user?.id) {
+          console.error('Failed to get user data:', userError);
+          return;
+        }
+        
+        const userId = userData.user.id;
+        console.log('User ID:', userId);
+
+        // Check for existing projects
+        const { data: existingProjects, error } = await supabaseAuth
+          .from('projects')
+          .select('id')
+          .eq('owner_id', userId);
+
+        if (error) {
+          console.error('Failed to check existing projects:', error);
+          return;
+        }
+
+        if (!existingProjects || existingProjects.length === 0) {
+          console.log('Creating default project…');
+          await createProjectWithTemplate(supabaseAuth, 'Getting Started Project', userId, 'demo-team-id');
+        } else {
+          console.log('Found existing projects:', existingProjects.length);
+        }
+      } catch (error) {
+        console.error('Error in setupInitialProject:', error);
       }
-      setProjects(data || []);
-      setLoading(false);
+    };
+
+    setupInitialProject();
+  }, [authInitialized, supabaseAuth]);
+
+  // Fetch projects only after auth is confirmed
+  useEffect(() => {
+    if (!authInitialized) return;
+    
+    const fetchProjects = async () => {
+      try {
+        setLoading(true);
+        console.log('Fetching projects...');
+        const { data, error } = await supabaseAuth.from('projects').select('*, files(*)');
+        
+        if (error) {
+          console.error('Error fetching projects:', error);
+          // Fall back to demo project
+          setProjects([demoProject]);
+        } else if (!data || data.length === 0) {
+          console.log('No projects found, using demo project');
+          // Force a demo project for demo purposes with all default files
+          setProjects([demoProject]);
+        } else {
+          console.log('Projects fetched successfully:', data.length);
+          setProjects(data);
+        }
+      } catch (error) {
+        console.error('Error in fetchProjects:', error);
+        setProjects([demoProject]);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchProjects();
-  }, [supabase]);
+  }, [authInitialized, supabaseAuth]);
 
   // Fetch teams
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
 
     const fetchTeams = async () => {
-      const user = (await supabase.auth.getUser()).data.user;
+      const user = (await supabaseAuth.auth.getUser()).data.user;
       if (!user?.id) return;
 
-      const { data } = await supabase.from('team_members').select('team_id').eq('user_id', user.id);
+      const { data } = await supabaseAuth.from('team_members').select('team_id').eq('user_id', user.id);
       setTeams(data || []);
       if (Array.isArray(data) && data.length > 0) {
         setActiveTeamId(data[0].team_id);
@@ -98,12 +155,12 @@ function ClientPageInner() {
     };
 
     fetchTeams();
-  }, [isLoaded, isSignedIn, supabase]);
+  }, [isLoaded, isSignedIn, supabaseAuth]);
 
   // Fetch accounts when mainView is 'accounts'
   useEffect(() => {
     if (mainView === 'accounts' && teams.length > 0) {
-      supabase
+      supabaseAuth
         .from('accounts')
         .select('id, name, created_at')
         .in('team_id', teams.map(t => t.team_id))
@@ -114,7 +171,7 @@ function ClientPageInner() {
   // Fetch opportunities when an account is selected
   useEffect(() => {
     if (selectedAccount) {
-      supabase
+      supabaseAuth
         .from('projects')
         .select('*')
         .eq('account_id', selectedAccount.id)

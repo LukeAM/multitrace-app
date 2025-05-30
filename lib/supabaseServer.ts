@@ -1,14 +1,10 @@
 // supabase-server.ts
-import { createServerClient } from '@supabase/ssr';
-import { cookies, headers } from 'next/headers';
+import { createClient } from '@supabase/supabase-js';
 
+// Create a single supabase client for interacting with your database
 export function createSupabaseServerClient() {
-  return createServerClient(
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies,
-      headers,
-    }
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 }

@@ -106,7 +106,6 @@ export function useClerkSupabaseAuth() {
           syncInProgress.current = true;
           
           try {
-            const syncResult = await syncCurrentUser(client, user);
             if (!syncResult.success) {
               console.warn('User sync failed, but continuing with app:', syncResult.error);
               // Don't block the app - user might still be able to use it with demo data

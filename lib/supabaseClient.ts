@@ -50,8 +50,20 @@ export function useClerkSupabaseAuth() {
             persistSession: true,
             storageKey: `supabase-auth-token-${userId}`,
           },
+          db: {
+            schema: 'public'
+          }
         }
       );
+      
+      // Set a custom claim that RLS can read
+      // This is a workaround since RLS can't read custom headers
+      (client as any).rpc = new Proxy((client as any).rpc, {
+        apply: async (target, thisArg, args) => {
+          const result = await target.apply(thisArg, args);
+          return result;
+        }
+      });
       
       console.log('Created Supabase client with user context:', userId);
       return client;

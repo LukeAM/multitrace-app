@@ -75,3 +75,14 @@ export function useClerkSupabaseAuth() {
 
   return { client: supabaseClient, isReady };
 }
+
+// Example of how project creation should work
+const createProject = async (projectData) => {
+  const { data, error } = await supabaseClient
+    .from('projects')
+    .insert({
+      ...projectData,
+      owner_id: userId, // Clerk user ID
+      team_id: `team-${userId}` // The auto-created team
+    });
+};

@@ -3,6 +3,7 @@ import { Webhook } from 'svix';
 import { WebhookEvent } from '@clerk/nextjs/server';
 import { createClient } from '@supabase/supabase-js';
 import { Clerk } from '@clerk/backend';
+import { randomUUID } from 'crypto';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -85,35 +86,53 @@ export async function POST(req: Request) {
           userId,
           role: 'org:admin',
         });
-
-        const { error: teamError } = await supabase.from('teams').insert([
-          {
-            id: org.id,
-            name: defaultName,
-          },
-        ]);
-
-        if (teamError) {
-          console.error('Failed to insert team into Supabase:', teamError);
-          return new Response('Failed to create team in Supabase', { status: 500 });
-        }
-
-        const { error: memberError } = await supabase.from('team_members').insert([
-          {
-            team_id: org.id,
-            user_id: userId,
-            role: 'owner',
-            joined_at: new Date().toISOString(),
-          },
-        ]);
-
-        if (memberError) {
-          console.error('Failed to insert team member into Supabase:', memberError);
-          return new Response('Failed to create team member in Supabase', { status: 500 });
-        }
       } catch (err) {
         console.error('Failed to create Clerk organization:', err);
         return new Response('Failed to create organization', { status: 500 });
+      }
+    }
+
+    // Handle organization.created
+    if (type === 'organization.created') {
+      const { id: orgId, name } = data;
+
+      const { error } = await supabase.from('teams').insert([
+        {
+          id: orgId,
+          name,
+        },
+      ]);
+
+      if (error) {
+        console.error('Failed to create team:', error);
+        return new Response('Failed to create team', { status: 500 });
+      }
+    }
+
+    // Handle organizationMembership.created
+    if (type === 'organizationMembership.created') {
+      const { organization, public_user_data, role } = data;
+      const userId = public_user_data?.user_id;
+      const teamId = organization?.id;
+
+      if (!userId || !teamId) {
+        console.error('Missing userId or teamId');
+        return new Response('Missing membership info', { status: 400 });
+      }
+
+      const { error } = await supabase.from('team_members').insert([
+        {
+          id: randomUUID(),
+          user_id: userId,
+          team_id: teamId,
+          role: role === 'org:admin' ? 'owner' : 'member',
+          joined_at: new Date().toISOString(),
+        },
+      ]);
+
+      if (error) {
+        console.error('Failed to create team member:', error);
+        return new Response('Failed to create team member', { status: 500 });
       }
     }
 

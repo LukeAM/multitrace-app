@@ -3,7 +3,7 @@ import { authMiddleware } from '@clerk/nextjs/server';
 // This middleware protects routes that require authentication
 export default authMiddleware({
   // Public routes that don't require authentication
-  publicRoutes: ['/sign-in', '/sign-up'],
+  publicRoutes: ['/sign-in', '/sign-up', '/api/hello'],
 });
 
 export const config = {

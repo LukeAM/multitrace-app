@@ -189,18 +189,36 @@ export default function ClientPage() {
     fetchTeams();
   }, [isAuthReady, supabaseClient, userId]);
 
-  // Fetch accounts when mainView is 'accounts'
+  // Fetch accounts when mainView is 'accounts' AND teams are loaded
   useEffect(() => {
-    if (!isAuthReady || !supabaseClient || teams.length === 0 || mainView !== 'accounts') return;
+    console.log('Account fetch effect triggered:', {
+      isAuthReady,
+      supabaseClient: !!supabaseClient,
+      teamsLength: teams.length,
+      teams: teams,
+      mainView,
+      activeTeamId
+    });
+    
+    // Don't fetch accounts until we have a team ID
+    if (!isAuthReady || !supabaseClient || !activeTeamId || mainView !== 'accounts') {
+      console.log('Skipping account fetch:', {
+        isAuthReady,
+        hasClient: !!supabaseClient,
+        activeTeamId,
+        mainView
+      });
+      return;
+    }
 
     const fetchAccounts = async () => {
       try {
-        console.log('Fetching accounts for teams:', teams.map(t => t.team_id).join(', '));
+        console.log('Fetching accounts for team:', activeTeamId);
         
         const { data, error } = await supabaseClient
           .from('accounts')
           .select('id, name, created_at, type')
-          .in('team_id', teams.map(t => t.team_id))
+          .eq('team_id', activeTeamId)  // Use activeTeamId directly instead of teams array
           .order('created_at', { ascending: false });
           
         if (error) {
@@ -208,7 +226,7 @@ export default function ClientPage() {
           return;
         }
         
-        console.log('Accounts fetched successfully:', data?.length || 0);
+        console.log('Accounts fetched successfully:', data?.length || 0, data);
         setAccounts(data || []);
       } catch (error) {
         console.error('Error in fetchAccounts:', error);
@@ -216,18 +234,18 @@ export default function ClientPage() {
     };
     
     fetchAccounts();
-  }, [mainView, teams, isAuthReady, supabaseClient]);
+  }, [mainView, activeTeamId, isAuthReady, supabaseClient]); // Changed dependencies
 
   // Function to handle account creation success
   const handleAccountCreated = async () => {
     console.log('Account created, refreshing accounts list');
     // Refresh the accounts list
-    if (isAuthReady && supabaseClient && teams.length > 0) {
+    if (isAuthReady && supabaseClient && activeTeamId) {
       try {
         const { data, error } = await supabaseClient
           .from('accounts')
           .select('id, name, created_at, type')
-          .in('team_id', teams.map(t => t.team_id))
+          .eq('team_id', activeTeamId)
           .order('created_at', { ascending: false });
           
         if (error) {

@@ -6,59 +6,71 @@ import Link from 'next/link';
 
 export default async function HomePage() {
   try {
+    console.log('=== HomePage called ===');
+    
     // Check authentication status with more detailed logging
     const { userId } = auth();
+    console.log('Auth check result - userId:', userId);
 
     if (!userId) {
-      console.log("User not authenticated, redirecting to sign-in");
+      console.log("No userId found, redirecting to sign-in");
       return redirect('/sign-in');
     }
     
-    // Get full user information with timeout handling
-    let user;
+    // For existing users, be more lenient about loading the app
+    // The client-side will handle the full authentication flow
+    console.log("User has userId, attempting to load app");
+    
+    // Try to get user data, but don't block the app if it fails
+    let user = null;
     try {
       user = await currentUser();
+      console.log("Current user loaded successfully:", user?.id);
     } catch (userError) {
-      console.error("Error fetching user data:", userError);
-      // If we can't get user data but have userId, still try to load the app
-      // The client-side will handle user sync
-      return <ClientPage />;
+      console.warn("Error fetching user data (non-blocking):", userError);
+      // Continue to load the app - the client-side will handle user sync
     }
     
-    if (!user) {
-      console.log("User data not available but userId exists, proceeding to app");
-      // Don't redirect immediately - let the client-side handle it
-      // This prevents loops when user exists in Clerk but data isn't immediately available
-      return <ClientPage />;
-    }
-
-    console.log("User authenticated successfully:", user.id);
-    // User is authenticated, render the client page
+    // Always load the app if we have a userId
+    // The client-side authentication and user sync will handle the rest
+    console.log("Loading ClientPage for user:", userId);
     return <ClientPage />;
+    
   } catch (error) {
-    console.error("Error in HomePage:", error);
-    // Don't redirect on error - show the error instead to prevent loops
+    console.error("Critical error in HomePage:", error);
+    
+    // Show a more helpful error page with debug link
     return (
       <div className="flex h-screen items-center justify-center p-4">
         <div className="max-w-md rounded-lg bg-red-50 p-6 text-center">
           <h2 className="mb-2 text-xl font-bold text-red-700">Authentication Error</h2>
-          <p className="mb-4 text-red-600">There was an error loading your account. Please try refreshing the page.</p>
-          <pre className="mt-4 overflow-auto rounded bg-red-100 p-2 text-left text-xs text-red-800">
+          <p className="mb-4 text-red-600">
+            There was an error loading your account. This might be a temporary issue.
+          </p>
+          <pre className="mt-4 overflow-auto rounded bg-red-100 p-2 text-left text-xs text-red-800 max-h-40">
             {error instanceof Error ? error.message : String(error)}
           </pre>
-          <div className="mt-4 flex gap-2 justify-center">
+          <div className="mt-6 flex flex-col gap-3">
             <Link 
-              href="/"
-              className="inline-block rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+              href="/debug-auth-page"
+              className="inline-block rounded bg-purple-600 px-4 py-2 text-white hover:bg-purple-700"
             >
-              Refresh Page
+              🔍 Debug Authentication
             </Link>
-            <Link 
-              href="/sign-in"
-              className="inline-block rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-            >
-              Sign In Again
-            </Link>
+            <div className="flex gap-2 justify-center">
+              <Link 
+                href="/"
+                className="inline-block rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+              >
+                Try Again
+              </Link>
+              <Link 
+                href="/sign-in"
+                className="inline-block rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+              >
+                Sign In Again
+              </Link>
+            </div>
           </div>
         </div>
       </div>

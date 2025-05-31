@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 import { Webhook } from 'svix';
 import { WebhookEvent } from '@clerk/nextjs/server';
 import { createClient } from '@supabase/supabase-js';
-import * as clerk from '@clerk/clerk-sdk-node';
+import { Clerk } from '@clerk/backend';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,10 +15,12 @@ const supabase = createClient(
   }
 );
 
+const clerk = Clerk({ secretKey: process.env.CLERK_SECRET_KEY! });
+
 export async function POST(req: Request) {
   try {
     const payload = await req.text();
-    const headerPayload = await headers();
+    const headerPayload = headers();
 
     const svixId = headerPayload.get('svix-id')!;
     const svixTimestamp = headerPayload.get('svix-timestamp')!;
@@ -60,8 +62,7 @@ export async function POST(req: Request) {
       const { error: userError } = await supabase.from('users').insert({
         id: userId,
         email,
-        first_name: first_name || '',
-        last_name: last_name || '',
+        name: `${first_name || ''} ${last_name || ''}`.trim(),
       });
 
       if (userError) {
@@ -76,7 +77,6 @@ export async function POST(req: Request) {
         });
         console.log(`Created org ${org.id} for user ${userId}`);
 
-        // Promote the user to owner explicitly
         await clerk.organizations.updateOrganizationMembership({
           organizationId: org.id,
           userId,

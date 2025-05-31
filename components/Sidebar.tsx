@@ -735,6 +735,9 @@ export default function Sidebar({ accounts, onSelect, selectedAccountId, onAccou
     try {
       console.log('Creating account with team_id:', activeTeamId);
       
+      // Add a short delay to ensure the auth token is fresh
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       const { data, error } = await supabaseClient
         .from('accounts')
         .insert([{ 
@@ -754,6 +757,7 @@ export default function Sidebar({ accounts, onSelect, selectedAccountId, onAccou
       setShowForm(false);
       if (onAccountCreated) onAccountCreated();
     } catch (err: any) {
+      console.error('Full error details:', err);
       setError(err.message || 'Failed to create account');
     } finally {
       setLoading(false);

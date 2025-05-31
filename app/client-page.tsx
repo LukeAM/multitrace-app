@@ -163,17 +163,20 @@ export default function ClientPage() {
 
     const fetchAccounts = async () => {
       try {
+        console.log('Fetching accounts for teams:', teams.map(t => t.team_id).join(', '));
+        
         const { data, error } = await supabaseClient
           .from('accounts')
-          .select('id, name, created_at')
+          .select('id, name, created_at, type')
           .in('team_id', teams.map(t => t.team_id))
           .order('created_at', { ascending: false });
           
         if (error) {
-          console.log('Error fetching accounts (expected with RLS):', error.message);
+          console.log('Error fetching accounts:', error.message);
           return;
         }
         
+        console.log('Accounts fetched successfully:', data?.length || 0);
         setAccounts(data || []);
       } catch (error) {
         console.error('Error in fetchAccounts:', error);
@@ -182,6 +185,32 @@ export default function ClientPage() {
     
     fetchAccounts();
   }, [mainView, teams, isAuthReady, supabaseClient]);
+
+  // Function to handle account creation success
+  const handleAccountCreated = async () => {
+    console.log('Account created, refreshing accounts list');
+    // Refresh the accounts list
+    if (isAuthReady && supabaseClient && teams.length > 0) {
+      try {
+        const { data, error } = await supabaseClient
+          .from('accounts')
+          .select('id, name, created_at, type')
+          .in('team_id', teams.map(t => t.team_id))
+          .order('created_at', { ascending: false });
+          
+        if (error) {
+          console.error('Error refreshing accounts:', error);
+          return;
+        }
+        
+        console.log('Accounts refreshed successfully:', data?.length || 0);
+        setAccounts(data || []);
+      } catch (error) {
+        console.error('Exception refreshing accounts:', error);
+      }
+    }
+    setMainView('accounts');
+  };
 
   // Fetch opportunities when an account is selected
   useEffect(() => {
@@ -250,7 +279,7 @@ export default function ClientPage() {
           accounts={accounts}
           onSelect={setSelectedAccount}
           selectedAccountId={selectedAccount?.id}
-          onAccountCreated={() => setMainView('accounts')}
+          onAccountCreated={handleAccountCreated}
           showDefault={showDefault}
           onShowDefault={setShowDefault}
         />

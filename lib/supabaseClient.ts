@@ -11,6 +11,14 @@ export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+// Define ProjectData interface
+interface ProjectData {
+  name: string;
+  description?: string;
+  account_id?: string;
+  [key: string]: any; // For any additional fields
+}
+
 // Hook for getting Supabase client with user context
 export function useClerkSupabaseAuth() {
   const { userId, isSignedIn, isLoaded } = useAuth();
@@ -73,16 +81,22 @@ export function useClerkSupabaseAuth() {
     setIsReady(true);
   }, [isLoaded, isSignedIn, userId, user]);
 
-  return { client: supabaseClient, isReady };
-}
+  // Example of how project creation should work
+  const createProject = async (projectData: ProjectData) => {
+    if (!userId) return { error: { message: 'User not authenticated' } };
+    
+    return await supabaseClient
+      .from('projects')
+      .insert({
+        ...projectData,
+        owner_id: userId,
+        team_id: `team-${userId}`
+      });
+  };
 
-// Example of how project creation should work
-const createProject = async (projectData) => {
-  const { data, error } = await supabaseClient
-    .from('projects')
-    .insert({
-      ...projectData,
-      owner_id: userId, // Clerk user ID
-      team_id: `team-${userId}` // The auto-created team
-    });
-};
+  return { 
+    client: supabaseClient, 
+    isReady,
+    createProject 
+  };
+}

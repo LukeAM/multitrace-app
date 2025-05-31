@@ -672,6 +672,27 @@ export default function Sidebar({ accounts, onSelect, selectedAccountId, onAccou
     
     const fetchTeams = async () => {
       try {
+        console.log('Fetching teams for Clerk user:', user.id);
+        
+        // First try to get team that was created by our trigger
+        const teamId = `team-${user.id}`;
+        console.log('Looking for auto-created team:', teamId);
+        
+        // Check if team exists directly
+        const { data: teamData, error: teamError } = await supabaseClient
+          .from('teams')
+          .select('id')
+          .eq('id', teamId)
+          .single();
+          
+        if (teamData) {
+          console.log('Found auto-created team:', teamData.id);
+          setActiveTeamId(teamData.id);
+          setTeams([{ team_id: teamData.id }]);
+          return;
+        }
+        
+        // Fallback to team_members query
         const { data, error } = await supabaseClient
           .from('team_members')
           .select('team_id')
@@ -682,8 +703,14 @@ export default function Sidebar({ accounts, onSelect, selectedAccountId, onAccou
           return;
         }
         
+        console.log('Team members query result:', data);
         setTeams(data || []);
-        if (data && data.length > 0) setActiveTeamId(data[0].team_id);
+        if (data && data.length > 0) {
+          console.log('Setting active team to:', data[0].team_id);
+          setActiveTeamId(data[0].team_id);
+        } else {
+          console.log('No teams found for user');
+        }
       } catch (err) {
         console.error('Error in fetchTeams:', err);
       }
@@ -706,11 +733,23 @@ export default function Sidebar({ accounts, onSelect, selectedAccountId, onAccou
       return;
     }
     try {
+      console.log('Creating account with team_id:', activeTeamId);
+      
       const { data, error } = await supabaseClient
         .from('accounts')
-        .insert([{ name: accountName, team_id: activeTeamId }])
+        .insert([{ 
+          name: accountName, 
+          team_id: activeTeamId,
+          type: activeFilter // Include the account type
+        }])
         .select();
-      if (error) throw error;
+        
+      if (error) {
+        console.error('Account creation error:', error);
+        throw error;
+      }
+      
+      console.log('Account created successfully:', data);
       setAccountName('');
       setShowForm(false);
       if (onAccountCreated) onAccountCreated();

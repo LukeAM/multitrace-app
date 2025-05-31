@@ -112,6 +112,25 @@ export default function ClientPage() {
       try {
         console.log('Fetching teams for user:', userId);
         
+        // First try to get team that was created by our trigger
+        const teamId = `team-${userId}`;
+        console.log('Looking for auto-created team:', teamId);
+        
+        // Check if team exists directly
+        const { data: teamData, error: teamError } = await supabaseClient
+          .from('teams')
+          .select('id')
+          .eq('id', teamId)
+          .single();
+          
+        if (teamData) {
+          console.log('Found auto-created team:', teamData.id);
+          setActiveTeamId(teamData.id);
+          setTeams([{ team_id: teamData.id }]);
+          return;
+        }
+        
+        // Fallback to team_members query
         const { data, error } = await supabaseClient
           .from('team_members')
           .select('team_id')
@@ -122,9 +141,13 @@ export default function ClientPage() {
           return;
         }
         
+        console.log('Team members query result:', data);
         setTeams(data || []);
         if (Array.isArray(data) && data.length > 0) {
+          console.log('Setting active team to:', data[0].team_id);
           setActiveTeamId(data[0].team_id);
+        } else {
+          console.log('No teams found for user');
         }
       } catch (error) {
         console.error('Error in fetchTeams:', error);

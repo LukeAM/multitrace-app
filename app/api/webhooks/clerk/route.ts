@@ -20,7 +20,7 @@ const clerk = Clerk({ secretKey: process.env.CLERK_SECRET_KEY! });
 export async function POST(req: Request) {
   try {
     const payload = await req.text();
-    const headerPayload = headers();
+    const headerPayload = await headers();
 
     const svixId = headerPayload.get('svix-id')!;
     const svixTimestamp = headerPayload.get('svix-timestamp')!;

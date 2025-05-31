@@ -2,8 +2,8 @@ import { headers } from 'next/headers';
 import { Webhook } from 'svix';
 import { WebhookEvent } from '@clerk/nextjs/server';
 import { createClient } from '@supabase/supabase-js';
-import { ensureUserExists } from '@/lib/userSync';
-// commends for change
+import { Clerk } from '@clerk/clerk-sdk-node';
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -15,10 +15,12 @@ const supabase = createClient(
   }
 );
 
+const clerk = new Clerk({ secretKey: process.env.CLERK_SECRET_KEY! });
+
 export async function POST(req: Request) {
   try {
     const payload = await req.text();
-    const headerPayload = await headers();
+    const headerPayload = headers();
 
     const svixId = headerPayload.get('svix-id')!;
     const svixTimestamp = headerPayload.get('svix-timestamp')!;
@@ -40,7 +42,7 @@ export async function POST(req: Request) {
 
     const { type, data } = evt;
 
-    // 1. Handle user.created
+    // Handle user.created
     if (type === 'user.created') {
       const {
         id: userId,
@@ -57,20 +59,38 @@ export async function POST(req: Request) {
         return new Response('Email address missing', { status: 400 });
       }
 
-      const result = await ensureUserExists(supabase, {
+      const { error: userError } = await supabase.from('users').insert({
         id: userId,
         email,
-        firstName: first_name || '',
-        lastName: last_name || '',
+        first_name: first_name || '',
+        last_name: last_name || '',
       });
 
-      if (!result.success) {
-        console.error('User insert failed:', result.error);
+      if (userError) {
+        console.error('User insert failed:', userError);
         return new Response('Failed to create user', { status: 500 });
+      }
+
+      try {
+        const org = await clerk.organizations.createOrganization({
+          name: `${first_name || ''} ${last_name || ''}`.trim() || 'My Team',
+          createdBy: userId,
+        });
+        console.log(`Created org ${org.id} for user ${userId}`);
+
+        // Promote the user to owner explicitly (just in case it's needed)
+        await clerk.organizations.updateOrganizationMembership({
+          organizationId: org.id,
+          userId,
+          role: 'org:admin',
+        });
+      } catch (err) {
+        console.error('Failed to create Clerk organization:', err);
+        return new Response('Failed to create organization', { status: 500 });
       }
     }
 
-    // 2. Handle organization.created
+    // Handle organization.created
     if (type === 'organization.created') {
       const { id: orgId, name } = data;
 
@@ -87,9 +107,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3. Handle organizationMembership.created
+    // Handle organizationMembership.created
     if (type === 'organizationMembership.created') {
-      const { organization, public_user_data } = data;
+      const { organization, public_user_data, role } = data;
       const userId = public_user_data?.user_id;
       const teamId = organization?.id;
 
@@ -102,7 +122,7 @@ export async function POST(req: Request) {
         {
           user_id: userId,
           team_id: teamId,
-          role: 'member',
+          role: role === 'org:admin' ? 'owner' : 'member',
           joined_at: new Date().toISOString(),
         },
       ]);

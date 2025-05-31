@@ -72,8 +72,10 @@ export async function POST(req: Request) {
       }
 
       try {
+        const defaultName = first_name ? `${first_name}'s Team` : 'My Team';
+
         const org = await clerk.organizations.createOrganization({
-          name: `${first_name || 'My'}'s Team`,
+          name: defaultName,
           createdBy: userId,
         });
         console.log(`Created org ${org.id} for user ${userId}`);

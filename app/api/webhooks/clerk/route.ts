@@ -18,7 +18,7 @@ const supabase = createClient(
 export async function POST(req: Request) {
   try {
     const payload = await req.text();
-    const headerPayload = await headers();
+    const headerPayload = headers();
 
     const svixId = headerPayload.get('svix-id')!;
     const svixTimestamp = headerPayload.get('svix-timestamp')!;
@@ -40,6 +40,7 @@ export async function POST(req: Request) {
 
     const { type, data } = evt;
 
+    // 1. Handle user.created
     if (type === 'user.created') {
       const {
         id: userId,
@@ -66,6 +67,49 @@ export async function POST(req: Request) {
       if (!result.success) {
         console.error('User insert failed:', result.error);
         return new Response('Failed to create user', { status: 500 });
+      }
+    }
+
+    // 2. Handle organization.created
+    if (type === 'organization.created') {
+      const { id: orgId, name } = data;
+
+      const { error } = await supabase.from('teams').insert([
+        {
+          id: orgId,
+          name,
+        },
+      ]);
+
+      if (error) {
+        console.error('Failed to create team:', error);
+        return new Response('Failed to create team', { status: 500 });
+      }
+    }
+
+    // 3. Handle organizationMembership.created
+    if (type === 'organizationMembership.created') {
+      const { organization, public_user_data } = data;
+      const userId = public_user_data?.user_id;
+      const teamId = organization?.id;
+
+      if (!userId || !teamId) {
+        console.error('Missing userId or teamId');
+        return new Response('Missing membership info', { status: 400 });
+      }
+
+      const { error } = await supabase.from('team_members').insert([
+        {
+          user_id: userId,
+          team_id: teamId,
+          role: 'member',
+          joined_at: new Date().toISOString(),
+        },
+      ]);
+
+      if (error) {
+        console.error('Failed to create team member:', error);
+        return new Response('Failed to create team member', { status: 500 });
       }
     }
 

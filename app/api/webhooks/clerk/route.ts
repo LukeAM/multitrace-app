@@ -61,9 +61,11 @@ export async function POST(req: Request) {
 
       const { error: userError } = await supabase.from('users').insert({
         id: userId,
+        clerk_user_id: userId, // <- this is the fix
         email,
         name: `${first_name || ''} ${last_name || ''}`.trim(),
       });
+      
 
       if (userError) {
         console.error('User insert failed:', userError);

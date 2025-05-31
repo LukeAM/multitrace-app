@@ -18,7 +18,7 @@ const supabase = createClient(
 export async function POST(req: Request) {
   try {
     const payload = await req.text();
-    const headerPayload = headers();
+    const headerPayload = await headers();
 
     const svixId = headerPayload.get('svix-id')!;
     const svixTimestamp = headerPayload.get('svix-timestamp')!;

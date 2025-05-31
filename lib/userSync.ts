@@ -5,7 +5,7 @@ export async function ensureUserExists(supabase: any, user: {
   lastName: string;
 }) {
   try {
-    const { data: existing } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from('users')
       .select('id')
       .eq('clerk_id', user.id)
@@ -15,20 +15,26 @@ export async function ensureUserExists(supabase: any, user: {
       return { success: true };
     }
 
-    const { error } = await supabase.from('users').insert([
-      {
-        clerk_id: user.id,
-        email: user.email,
-        name: `${user.firstName} ${user.lastName}`,
-      },
-    ]);
+    const insertPayload = {
+      clerk_id: user.id,
+      email: user.email,
+      name: `${user.firstName} ${user.lastName}`,
+    };
+
+    console.log('[ensureUserExists] Insert payload:', insertPayload);
+
+    const { error } = await supabase
+      .from('users')
+      .insert([insertPayload]);
 
     if (error) {
+      console.error('[ensureUserExists] Supabase insert error:', error);
       return { success: false, error };
     }
 
     return { success: true };
   } catch (err) {
+    console.error('[ensureUserExists] Unexpected error:', err);
     return { success: false, error: err };
   }
 }

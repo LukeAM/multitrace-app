@@ -147,7 +147,39 @@ export default function ClientPage() {
           console.log('Setting active team to:', data[0].team_id);
           setActiveTeamId(data[0].team_id);
         } else {
-          console.log('No teams found for user');
+          console.log('No teams found for user, creating a new team');
+          
+          // For new users, create a team automatically
+          const { data: newTeam, error: createError } = await supabaseClient
+            .from('teams')
+            .insert([
+              { id: teamId, name: 'My Team' }
+            ])
+            .select()
+            .single();
+            
+          if (createError) {
+            console.error('Error creating team:', createError);
+            return;
+          }
+          
+          console.log('Created new team:', newTeam);
+          
+          // Add user to the team
+          const { error: memberError } = await supabaseClient
+            .from('team_members')
+            .insert([
+              { team_id: teamId, user_id: userId, role: 'admin' }
+            ]);
+            
+          if (memberError) {
+            console.error('Error adding user to team:', memberError);
+            return;
+          }
+          
+          console.log('Added user to team successfully');
+          setActiveTeamId(teamId);
+          setTeams([{ team_id: teamId }]);
         }
       } catch (error) {
         console.error('Error in fetchTeams:', error);

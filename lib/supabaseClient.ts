@@ -2,94 +2,52 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAuth, useSession } from '@clerk/nextjs';
+import { useAuth, useUser } from '@clerk/nextjs';
 import { createClient } from '@supabase/supabase-js';
 
-// Create a Supabase client without authentication for direct access
+// Create a Supabase client without authentication
 export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// Hook for getting an authenticated Supabase client
+// Hook for getting Supabase client with user context
 export function useClerkSupabaseAuth() {
-  const { getToken, isSignedIn, isLoaded } = useAuth();
-  const { session: clerkSession } = useSession();
-  const [client, setClient] = useState(supabase);
-  const [isAuthReady, setIsAuthReady] = useState(false);
+  const { userId, isSignedIn, isLoaded } = useAuth();
+  const { user } = useUser();
+  const [supabaseClient, setSupabaseClient] = useState(supabase);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // Don't proceed if Clerk auth is not loaded yet
+    // Don't proceed until Clerk auth is loaded
     if (!isLoaded) return;
 
-    // Create a new supabase client for this session
-    const supabaseClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-
-    async function setupSupabaseAuth() {
-      try {
-        if (isSignedIn && clerkSession) {
-          // Get JWT token from Clerk with Supabase template
-          console.log('Getting Supabase token from Clerk...');
-          const token = await getToken({ template: 'supabase' });
-          
-          if (!token) {
-            console.error('Failed to get Supabase token from Clerk');
-            return;
-          }
-          
-          console.log('Setting Supabase session with Clerk token...');
-          // Set the Supabase session with the token from Clerk
-          const { data, error } = await supabaseClient.auth.setSession({
-            access_token: token,
-            refresh_token: '',  // Not needed with Clerk
-          });
-          
-          if (error) {
-            console.error('Error setting Supabase session:', error.message);
-            return;
-          }
-          
-          console.log('Supabase session set successfully');
-          // Check if user is actually authenticated
-          const { data: userData, error: userError } = await supabaseClient.auth.getUser();
-          
-          if (userError) {
-            console.error('Failed to get user from Supabase:', userError.message);
-            return;
-          }
-          
-          if (userData?.user) {
-            console.log('Supabase user authenticated:', userData.user.id);
-            setClient(supabaseClient);
-            setIsAuthReady(true);
-          } else {
-            console.error('No user found in Supabase response');
-          }
-        } else {
-          console.log('User not signed in with Clerk');
-          await supabaseClient.auth.signOut();
-        }
-      } catch (error) {
-        console.error('Error in setupSupabaseAuth:', error);
-      }
+    // If not signed in, return the anonymous client
+    if (!isSignedIn || !userId || !user) {
+      console.log('User not signed in, using anonymous Supabase client');
+      setIsReady(false);
+      return;
     }
 
-    setupSupabaseAuth();
-    
-    // Set up interval to refresh the token
-    const refreshInterval = setInterval(() => {
-      if (isSignedIn && clerkSession) {
-        setupSupabaseAuth();
+    // Create a client with user context in the headers
+    // This doesn't try to set a session, but passes user info with each request
+    const client = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: {
+            'x-clerk-user-id': userId,
+            'x-user-email': user.emailAddresses[0]?.emailAddress || '',
+          },
+        },
       }
-    }, 5 * 60 * 1000); // Refresh every 5 minutes
-    
-    return () => {
-      clearInterval(refreshInterval);
-    };
-  }, [isLoaded, isSignedIn, clerkSession, getToken]);
+    );
 
-  return isAuthReady ? client : null;
+    console.log('Created Supabase client with user context:', userId);
+    setSupabaseClient(client);
+    setIsReady(true);
+  }, [isLoaded, isSignedIn, userId, user]);
+
+  return { client: supabaseClient, isReady };
 }

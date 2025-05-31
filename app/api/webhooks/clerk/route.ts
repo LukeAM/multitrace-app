@@ -3,7 +3,6 @@ import { Webhook } from 'svix';
 import { WebhookEvent } from '@clerk/nextjs/server';
 import { createClient } from '@supabase/supabase-js';
 import { Clerk } from '@clerk/backend';
-import { randomUUID } from 'crypto';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -73,12 +72,14 @@ export async function POST(req: Request) {
       }
 
       try {
-        const defaultName = first_name ? `${first_name}'s Team` : 'My Team';
+        const fallbackName = first_name?.trim() || 'User';
+        const orgName = `${fallbackName}'s Team`;
 
         const org = await clerk.organizations.createOrganization({
-          name: defaultName,
+          name: orgName,
           createdBy: userId,
         });
+
         console.log(`Created org ${org.id} for user ${userId}`);
 
         await clerk.organizations.updateOrganizationMembership({
@@ -122,7 +123,6 @@ export async function POST(req: Request) {
 
       const { error } = await supabase.from('team_members').insert([
         {
-          id: randomUUID(),
           user_id: userId,
           team_id: teamId,
           role: role === 'org:admin' ? 'owner' : 'member',

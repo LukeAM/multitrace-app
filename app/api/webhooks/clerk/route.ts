@@ -22,9 +22,9 @@ export async function POST(req: Request) {
     const payload = await req.text();
     const headerPayload = await headers();
 
-    const svixId = headerPayload.get('svix-id')!;
-    const svixTimestamp = headerPayload.get('svix-timestamp')!;
-    const svixSignature = headerPayload.get('svix-signature')!;
+    const svixId = (await headerPayload).get('svix-id')!;
+    const svixTimestamp = (await headerPayload).get('svix-timestamp')!;
+    const svixSignature = (await headerPayload).get('svix-signature')!;
 
     const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET!);
 
@@ -59,13 +59,11 @@ export async function POST(req: Request) {
         return new Response('Email address missing', { status: 400 });
       }
 
-      const fullName = `${first_name || ''} ${last_name || ''}`.trim();
-
       const { error: userError } = await supabase.from('users').insert({
         id: userId,
         clerk_user_id: userId,
         email,
-        name: fullName,
+        name: `${first_name || ''} ${last_name || ''}`.trim(),
       });
 
       if (userError) {
@@ -74,10 +72,8 @@ export async function POST(req: Request) {
       }
 
       try {
-        const orgName = first_name ? `${first_name}'s team` : fullName || 'My Team';
-
         const org = await clerk.organizations.createOrganization({
-          name: orgName,
+          name: `${first_name || 'My'}'s Team`,
           createdBy: userId,
         });
         console.log(`Created org ${org.id} for user ${userId}`);
@@ -87,8 +83,8 @@ export async function POST(req: Request) {
           userId,
           role: 'org:admin',
         });
-      } catch (err: any) {
-        console.error('Failed to create Clerk organization:', err?.errors ?? err);
+      } catch (err) {
+        console.error('Failed to create Clerk organization:', err);
         return new Response('Failed to create organization', { status: 500 });
       }
     }

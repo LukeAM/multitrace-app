@@ -105,21 +105,6 @@ export function useClerkSupabaseAuth() {
           userSyncAttempted.current = true;
           syncInProgress.current = true;
           
-          try {
-            if (!syncResult.success) {
-              console.warn('User sync failed, but continuing with app:', syncResult.error);
-              // Don't block the app - user might still be able to use it with demo data
-              // Reset sync attempt flag so it can be retried later if needed
-              userSyncAttempted.current = false;
-            } else {
-              console.log('User sync successful');
-            }
-          } catch (syncError) {
-            console.error('User sync exception:', syncError);
-            userSyncAttempted.current = false;
-          } finally {
-            syncInProgress.current = false;
-          }
         }
         
         // Test query to check RLS policy effectiveness

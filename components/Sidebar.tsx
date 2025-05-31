@@ -73,7 +73,7 @@ function AddFileModal({ open, onClose, section, onAdd }: { open: boolean, onClos
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [integrationUrl, setIntegrationUrl] = useState('');
-  const supabase = useClerkSupabaseAuth();
+  const { client: supabaseClient, isReady } = useClerkSupabaseAuth();
   const { user } = useUser();
   const { toast } = useToast();
 
@@ -95,7 +95,7 @@ function AddFileModal({ open, onClose, section, onAdd }: { open: boolean, onClos
     setUploading(true);
     setUploadError(null);
     try {
-      if (!integrationUrl.trim() || !user?.id) {
+      if (!integrationUrl.trim() || !user?.id || !supabaseClient) {
         setUploadError('Please enter a valid URL and ensure you are signed in.');
         setUploading(false);
         return;
@@ -128,7 +128,7 @@ function AddFileModal({ open, onClose, section, onAdd }: { open: boolean, onClos
         createdAt: timestamp,
         created_by: user.id,
       };
-      await supabase.from('files').insert([newFile]);
+      await supabaseClient.from('files').insert([newFile]);
       onAdd(newFile);
       toast({ title: 'Artifact added', description: 'The file was added successfully.' });
       setUploading(false);
@@ -149,7 +149,7 @@ function AddFileModal({ open, onClose, section, onAdd }: { open: boolean, onClos
     try {
       const input = (document.getElementById('file-upload-input') as HTMLInputElement);
       const f = input?.files?.[0];
-      if (!f || !user?.id) {
+      if (!f || !user?.id || !supabaseClient) {
         setUploadError('No file or user.');
         setUploading(false);
         return;
@@ -158,7 +158,7 @@ function AddFileModal({ open, onClose, section, onAdd }: { open: boolean, onClos
       const originalName = f.name.replace(/\s+/g, '_').toLowerCase();
       const ext = originalName.split('.').pop();
       const machineName = `${section}_${user.id}_${timestamp}_${originalName}`;
-      const { data, error } = await supabase.storage.from('files').upload(machineName, f, {
+      const { data, error } = await supabaseClient.storage.from('files').upload(machineName, f, {
         cacheControl: '3600',
         upsert: false,
       });
@@ -168,7 +168,7 @@ function AddFileModal({ open, onClose, section, onAdd }: { open: boolean, onClos
         setUploading(false);
         return;
       }
-      const url = supabase.storage.from('files').getPublicUrl(machineName).data.publicUrl;
+      const url = supabaseClient.storage.from('files').getPublicUrl(machineName).data.publicUrl;
       const newFile: File = {
         id: machineName,
         name: f.name,
@@ -179,7 +179,7 @@ function AddFileModal({ open, onClose, section, onAdd }: { open: boolean, onClos
         createdAt: timestamp,
         created_by: user.id,
       };
-      await supabase.from('files').insert([newFile]);
+      await supabaseClient.from('files').insert([newFile]);
       onAdd(newFile);
       toast({ title: 'File uploaded', description: 'The file was uploaded successfully.' });
       setUploading(false);
@@ -665,18 +665,32 @@ export default function Sidebar({ accounts, onSelect, selectedAccountId, onAccou
   const { user, isLoaded } = useUser();
   const [teams, setTeams] = useState<Array<{ team_id: string }>>([]);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
+  const { client: supabaseClient, isReady } = useClerkSupabaseAuth();
 
   useEffect(() => {
-    if (!user?.id) return;
-    useClerkSupabaseAuth()
-      .from('team_members')
-      .select('team_id')
-      .eq('user_id', user.id)
-      .then(({ data }) => {
+    if (!user?.id || !supabaseClient || !isReady) return;
+    
+    const fetchTeams = async () => {
+      try {
+        const { data, error } = await supabaseClient
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', user.id);
+          
+        if (error) {
+          console.log('Error fetching teams in Sidebar:', error.message);
+          return;
+        }
+        
         setTeams(data || []);
         if (data && data.length > 0) setActiveTeamId(data[0].team_id);
-      });
-  }, [user?.id]);
+      } catch (err) {
+        console.error('Error in fetchTeams:', err);
+      }
+    };
+    
+    fetchTeams();
+  }, [user?.id, supabaseClient, isReady]);
 
   const filteredAccounts = accounts.filter(
     (acc) => acc.type === activeFilter
@@ -686,13 +700,13 @@ export default function Sidebar({ accounts, onSelect, selectedAccountId, onAccou
     e.preventDefault();
     setLoading(true);
     setError(null);
-    if (!activeTeamId) {
-      setError('No team selected.');
+    if (!activeTeamId || !supabaseClient) {
+      setError('No team selected or client not ready.');
       setLoading(false);
       return;
     }
     try {
-      const { data, error } = await useClerkSupabaseAuth()
+      const { data, error } = await supabaseClient
         .from('accounts')
         .insert([{ name: accountName, team_id: activeTeamId }])
         .select();

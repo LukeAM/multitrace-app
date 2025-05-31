@@ -4,11 +4,10 @@ import Sidebar from '@/components/Sidebar';
 import Editor from '@/components/Editor';
 import Copilot from '@/components/Copilot';
 import TopBar from '@/components/TopBar';
-import { UserButton } from '@clerk/nextjs';
+import { UserButton, useAuth, useUser } from '@clerk/nextjs';
 import { useClerkSupabaseAuth } from '@/lib/supabaseClient';
 import { ProjectProvider } from '@/lib/ProjectContext';
 import { createProjectWithTemplate } from '@/lib/createProjectWithTemplate';
-import { useAuth } from '@clerk/nextjs';
 import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
@@ -17,17 +16,16 @@ import DealSummaryDashboard from '@/components/DealSummaryDashboard';
 import DashboardShell from '@/components/DashboardShell';
 import OpportunitiesList from '@/components/OpportunitiesList';
 import OpportunityDetails from '@/components/OpportunityDetails';
-import { supabase } from '@/lib/supabaseClient';
 import LegacyDemoProject from '@/components/LegacyDemoProject';
 import LegacySidebar from '@/components/LegacySidebar';
 
 // draft file only. need to work on this. 
 
 export default function ClientPage() {
-  const supabase = useClerkSupabaseAuth();
-  const { isLoaded, isSignedIn } = useAuth();
+  const { client: supabaseClient, isReady: supabaseReady } = useClerkSupabaseAuth();
+  const { isLoaded, isSignedIn, userId } = useAuth();
+  const { user } = useUser();
   const { currentFile, selectedTimelineEntry } = useAppStore();
-  // No need to check isSignedIn or user here, server already guarantees authentication
 
   const [visible, setVisible] = useState({
     sidebar: false,
@@ -48,65 +46,128 @@ export default function ClientPage() {
   const [teams, setTeams] = useState<Array<{ team_id: string }>>([]);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
 
+  const isAuthReady = isLoaded && isSignedIn && supabaseReady && user && userId;
+
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
+    if (!isAuthReady || !supabaseClient) return;
+    
     const setupInitialProject = async () => {
-      // user is guaranteed to exist, get from supabase auth
-      const user = (await supabase.auth.getUser()).data.user;
-      if (!user?.id) return;
+      try {
+        const { data: existingProjects, error } = await supabaseClient
+          .from('projects')
+          .select('id')
+          .eq('owner_id', userId);
 
-      const { data: existingProjects, error } = await supabase
-        .from('projects')
-        .select('id')
-        .eq('owner_id', user.id);
-
-      if (error) {
-        console.error('Failed to check existing projects:', error);
-        return;
-      }
-
-      if (existingProjects.length === 0) {
-        console.log('Creating default project…');
-        if (activeTeamId) {
-          await createProjectWithTemplate(supabase, 'Getting Started Project', user.id, activeTeamId);
-        } else {
-          console.error('No active team ID for project creation');
+        if (error) {
+          console.log('Error checking existing projects (expected with RLS):', error.message);
+          return;
         }
+
+        if (existingProjects.length === 0) {
+          console.log('Creating default project…');
+          if (activeTeamId) {
+            await createProjectWithTemplate(supabaseClient, 'Getting Started Project', userId, activeTeamId);
+          } else {
+            console.error('No active team ID for project creation');
+          }
+        }
+      } catch (error) {
+        console.error('Error in setupInitialProject:', error);
       }
     };
 
     setupInitialProject();
-  }, [isLoaded, isSignedIn, supabase]);
+  }, [isAuthReady, supabaseClient, userId, activeTeamId]);
 
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
+    if (!isAuthReady || !supabaseClient) return;
+    
     async function fetchTeams() {
-      const user = (await supabase.auth.getUser()).data.user;
-      if (!user?.id) return;
-      const { data } = await supabase
-        .from('team_members')
-        .select('team_id')
-        .eq('user_id', user.id);
-      setTeams(data || []);
-      if (data && data.length > 0) setActiveTeamId(data[0].team_id);
+      try {
+        const { data, error } = await supabaseClient
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', userId);
+          
+        if (error) {
+          console.log('Error fetching teams (expected with RLS):', error.message);
+          return;
+        }
+        
+        setTeams(data || []);
+        if (data && data.length > 0) setActiveTeamId(data[0].team_id);
+      } catch (error) {
+        console.error('Error in fetchTeams:', error);
+      }
     }
     fetchTeams();
-  }, [isLoaded, isSignedIn, supabase]);
+  }, [isAuthReady, supabaseClient, userId]);
 
   // Fetch accounts when mainView is 'accounts'
   useEffect(() => {
-    if (mainView === 'accounts') {
-      supabase.from('accounts').select('id, name, created_at').then(({ data }) => setAccounts(data || []));
-    }
-  }, [mainView]);
+    if (!isAuthReady || !supabaseClient || mainView !== 'accounts') return;
+    
+    const fetchAccounts = async () => {
+      try {
+        const { data, error } = await supabaseClient
+          .from('accounts')
+          .select('id, name, created_at');
+          
+        if (error) {
+          console.log('Error fetching accounts (expected with RLS):', error.message);
+          return;
+        }
+        
+        setAccounts(data || []);
+      } catch (error) {
+        console.error('Error in fetchAccounts:', error);
+      }
+    };
+    
+    fetchAccounts();
+  }, [mainView, isAuthReady, supabaseClient]);
 
   // Fetch opportunities when an account is selected
   useEffect(() => {
-    if (selectedAccount) {
-      supabase.from('projects').select('*').eq('account_id', selectedAccount.id).then(({ data }) => setOpportunities(data || []));
-      setMainView('opportunities');
-    }
-  }, [selectedAccount]);
+    if (!selectedAccount || !isAuthReady || !supabaseClient) return;
+    
+    const fetchOpportunities = async () => {
+      try {
+        const { data, error } = await supabaseClient
+          .from('projects')
+          .select('*')
+          .eq('account_id', selectedAccount.id);
+          
+        if (error) {
+          console.log('Error fetching opportunities (expected with RLS):', error.message);
+          return;
+        }
+        
+        setOpportunities(data || []);
+        setMainView('opportunities');
+      } catch (error) {
+        console.error('Error in fetchOpportunities:', error);
+      }
+    };
+    
+    fetchOpportunities();
+  }, [selectedAccount, isAuthReady, supabaseClient]);
+
+  if (!isLoaded) {
+    return <div className="flex h-screen items-center justify-center">Loading authentication...</div>;
+  }
+
+  if (!isSignedIn) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center p-4">
+        <div className="mb-4 text-xl font-bold text-red-500">Authentication Required</div>
+        <div className="mb-6">Please sign in to access this application.</div>
+        <a href="/sign-in" className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600">
+          Sign In
+        </a>
+      </div>
+    );
+  }
 
   if (loading) return <div>Loading projects…</div>;
 

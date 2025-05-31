@@ -3,18 +3,27 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
-import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
 
-// Create the Supabase client
-const supabaseClient = createPagesBrowserClient();
+// Create a Supabase client without authentication for direct access
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
-export const supabase = supabaseClient;
-
+// Hook for getting an authenticated Supabase client
 export function useClerkSupabaseAuth() {
   const { getToken, isSignedIn, isLoaded } = useAuth();
+  const [client, setClient] = useState(supabase);
   const [isAuthReady, setIsAuthReady] = useState(false);
 
   useEffect(() => {
+    // Create a new client for each session to avoid shared state issues
+    const supabaseClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
     const setSupabaseAuth = async () => {
       try {
         // Only proceed if Clerk auth is fully loaded
@@ -26,11 +35,17 @@ export function useClerkSupabaseAuth() {
           
           if (token) {
             console.log('Clerk token received, setting Supabase session');
-            await supabaseClient.auth.setSession({
+            const { error } = await supabaseClient.auth.setSession({
               access_token: token,
-              refresh_token: '', // not needed with Clerk
+              refresh_token: '',
             });
-            console.log('Supabase session set successfully');
+            
+            if (error) {
+              console.error('Error setting Supabase session:', error);
+            } else {
+              console.log('Supabase session set successfully');
+              setClient(supabaseClient);
+            }
           } else {
             console.error('Failed to get token from Clerk');
           }
@@ -46,7 +61,16 @@ export function useClerkSupabaseAuth() {
     };
 
     setSupabaseAuth();
+    
+    // Refresh token periodically
+    const refreshInterval = setInterval(() => {
+      if (isSignedIn && isLoaded) {
+        setSupabaseAuth();
+      }
+    }, 10 * 60 * 1000); // Refresh every 10 minutes
+    
+    return () => clearInterval(refreshInterval);
   }, [getToken, isSignedIn, isLoaded]);
 
-  return supabaseClient;
+  return client;
 }

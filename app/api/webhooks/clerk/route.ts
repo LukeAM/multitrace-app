@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { Webhook } from 'svix';
 import { WebhookEvent } from '@clerk/nextjs/server';
-import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import { ensureUserExists } from '@/lib/userSync';
 
@@ -16,39 +15,30 @@ const supabase = createClient(
   }
 );
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const h = await headers(); 
-    const svixId = h.get('svix-id');
-    const svixTimestamp = h.get('svix-timestamp');
-    const svixSignature = h.get('svix-signature');
-    const rawBody = await req.text();
+    const payload = await req.text();
+    const headerPayload = await headers();
 
-    if (!svixId || !svixTimestamp || !svixSignature) {
-      return new Response('Missing svix headers', { status: 400 });
-    }
+    const svixId = headerPayload.get('svix-id')!;
+    const svixTimestamp = headerPayload.get('svix-timestamp')!;
+    const svixSignature = headerPayload.get('svix-signature')!;
 
-    const webhookSecret = process.env.CLERK_WEBHOOK_SECRET;
-    if (!webhookSecret) {
-      return new Response('Webhook secret not configured', { status: 500 });
-    }
+    const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET!);
 
-    const expectedSignature = crypto
-      .createHmac('sha256', webhookSecret)
-      .update(svixId + svixTimestamp + rawBody)
-      .digest('base64');
-
-    const providedSignature = svixSignature
-      .split(' ')
-      .find((s) => s.startsWith('v1,'))
-      ?.replace('v1,', '');
-
-    if (!providedSignature || providedSignature !== expectedSignature) {
+    let evt: WebhookEvent;
+    try {
+      evt = wh.verify(payload, {
+        'svix-id': svixId,
+        'svix-timestamp': svixTimestamp,
+        'svix-signature': svixSignature,
+      }) as WebhookEvent;
+    } catch (err) {
+      console.error('Webhook signature verification failed:', err);
       return new Response('Invalid signature', { status: 400 });
     }
 
-    const event: WebhookEvent = JSON.parse(rawBody);
-    const { type, data } = event;
+    const { type, data } = evt;
 
     if (type === 'user.created') {
       const {
@@ -74,14 +64,14 @@ export async function POST(req: NextRequest) {
       });
 
       if (!result.success) {
-        console.error('User insert error:', result.error);
+        console.error('User insert failed:', result.error);
         return new Response('Failed to create user', { status: 500 });
       }
     }
 
     return new Response('Webhook processed', { status: 200 });
-  } catch (error) {
-    console.error('Webhook handler error:', error);
+  } catch (err) {
+    console.error('Webhook error:', err);
     return new Response('Internal server error', { status: 500 });
   }
 }

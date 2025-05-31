@@ -4,7 +4,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth, useUser } from '@clerk/nextjs';
 import { createClient } from '@supabase/supabase-js';
-import { syncCurrentUser } from './userSync';
 
 // Create a Supabase client without authentication
 export const supabase = createClient(

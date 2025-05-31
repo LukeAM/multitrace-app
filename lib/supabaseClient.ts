@@ -45,6 +45,30 @@ export function useClerkSupabaseAuth() {
     );
 
     console.log('Created Supabase client with user context:', userId);
+    console.log('Debug - Clerk User ID format:', userId);
+    console.log('Debug - Clerk Email:', user.emailAddresses[0]?.emailAddress || 'none');
+    
+    // Test query to check RLS policy effectiveness
+    async function testQuery() {
+      try {
+        const { data, error } = await client
+          .from('projects')
+          .select('id, name')
+          .limit(1);
+          
+        if (error) {
+          console.error('Auth test query failed:', error.message);
+          console.error('Detailed error:', error);
+        } else {
+          console.log('Auth test query succeeded:', data);
+        }
+      } catch (e) {
+        console.error('Test query exception:', e);
+      }
+    }
+    
+    testQuery();
+    
     setSupabaseClient(client);
     setIsReady(true);
   }, [isLoaded, isSignedIn, userId, user]);

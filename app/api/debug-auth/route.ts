@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { createClient } from '@supabase/supabase-js';
+import { ensureUserExists } from '@/lib/userSync';
 
 export async function GET() {
   try {
@@ -23,6 +24,7 @@ export async function GET() {
     // Check if user exists in Supabase
     let supabaseUserExists = false;
     let supabaseError = null;
+    let userCreationTest = null;
     
     if (userId) {
       try {
@@ -37,6 +39,8 @@ export async function GET() {
           }
         );
         
+        // Test 1: Check if user exists
+        console.log('Testing user existence...');
         const { data: dbUser, error } = await supabase
           .from('users')
           .select('id, email, created_at')
@@ -45,12 +49,58 @@ export async function GET() {
           
         if (error) {
           supabaseError = error.message;
+          console.log('User does not exist, error:', error);
         } else if (dbUser) {
           supabaseUserExists = true;
+          console.log('User exists:', dbUser);
         }
+        
+        // Test 2: Try to create user if they don't exist and we have user data
+        if (!supabaseUserExists && user) {
+          console.log('Attempting to create user...');
+          try {
+            const creationResult = await ensureUserExists(supabase, {
+              id: userId,
+              email: user.emailAddresses[0]?.emailAddress || '',
+              firstName: user.firstName || '',
+              lastName: user.lastName || ''
+            });
+            
+            userCreationTest = {
+              attempted: true,
+              success: creationResult.success,
+              error: creationResult.error || null
+            };
+            
+            if (creationResult.success) {
+              console.log('User creation successful!');
+              supabaseUserExists = true;
+            } else {
+              console.log('User creation failed:', creationResult.error);
+            }
+          } catch (createError) {
+            const errorMsg = createError instanceof Error ? createError.message : String(createError);
+            userCreationTest = {
+              attempted: true,
+              success: false,
+              error: errorMsg
+            };
+            console.error('User creation exception:', createError);
+          }
+        }
+        
+        // Test 3: Check table structure
+        console.log('Checking users table structure...');
+        const { data: tableInfo, error: tableError } = await supabase
+          .from('users')
+          .select('*')
+          .limit(1);
+          
+        console.log('Table query result:', { data: tableInfo, error: tableError });
         
       } catch (err) {
         supabaseError = err instanceof Error ? err.message : String(err);
+        console.error('Supabase connection error:', err);
       }
     }
     
@@ -62,17 +112,22 @@ export async function GET() {
         userExists: !!user,
         userError,
         userEmail: user?.emailAddresses?.[0]?.emailAddress || null,
-        userCreatedAt: user?.createdAt || null
+        userCreatedAt: user?.createdAt || null,
+        userFirstName: user?.firstName || null,
+        userLastName: user?.lastName || null
       },
       supabase: {
         userExists: supabaseUserExists,
-        error: supabaseError
+        error: supabaseError,
+        userCreationTest
       },
       environment: {
         hasClerkPublishableKey: !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
         hasClerkSecretKey: !!process.env.CLERK_SECRET_KEY,
+        hasClerkWebhookSecret: !!process.env.CLERK_WEBHOOK_SECRET,
         hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        hasSupabaseServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+        hasSupabaseServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...',
       }
     };
     
@@ -85,7 +140,8 @@ export async function GET() {
     return NextResponse.json(
       { 
         error: error.message || 'Unknown error',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        stack: error.stack
       },
       { status: 500 }
     );

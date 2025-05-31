@@ -1,7 +1,7 @@
 // lib/supabaseClient.tsx
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth, useUser } from '@clerk/nextjs';
 import { createClient } from '@supabase/supabase-js';
 import { syncCurrentUser } from './userSync';
@@ -27,7 +27,11 @@ export function useClerkSupabaseAuth() {
   const [supabaseClient, setSupabaseClient] = useState(supabase);
   const [isReady, setIsReady] = useState(false);
   const [lastError, setLastError] = useState<Error | null>(null);
-  const [userSyncAttempted, setUserSyncAttempted] = useState(false);
+  
+  // Use refs to track sync attempts and prevent multiple simultaneous syncs
+  const userSyncAttempted = useRef(false);
+  const syncInProgress = useRef(false);
+  const lastUserId = useRef<string | null>(null);
 
   // Create a stable Supabase client
   const createSupabaseClient = useCallback(() => {
@@ -71,13 +75,23 @@ export function useClerkSupabaseAuth() {
     // Don't proceed until Clerk auth is loaded
     if (!isLoaded) return;
 
-    // If not signed in, return the anonymous client
+    // If not signed in, reset state and return the anonymous client
     if (!isSignedIn || !userId || !user) {
       console.log('User not signed in, using anonymous Supabase client');
       setIsReady(false);
       setSupabaseClient(supabase);
-      setUserSyncAttempted(false);
+      userSyncAttempted.current = false;
+      syncInProgress.current = false;
+      lastUserId.current = null;
       return;
+    }
+
+    // If user changed, reset sync attempts
+    if (lastUserId.current !== userId) {
+      console.log('User changed, resetting sync state');
+      userSyncAttempted.current = false;
+      syncInProgress.current = false;
+      lastUserId.current = userId;
     }
 
     const initializeClient = async () => {
@@ -86,17 +100,27 @@ export function useClerkSupabaseAuth() {
         console.log('Debug - Clerk User ID format:', userId);
         console.log('Debug - Clerk Email:', user.emailAddresses[0]?.emailAddress || 'none');
         
-        // Only attempt user sync once per session to prevent loops
-        if (!userSyncAttempted) {
+        // Only attempt user sync once per user session and not if already in progress
+        if (!userSyncAttempted.current && !syncInProgress.current) {
           console.log('Attempting to sync user to Supabase...');
-          setUserSyncAttempted(true);
+          userSyncAttempted.current = true;
+          syncInProgress.current = true;
           
-          const syncResult = await syncCurrentUser(client, user);
-          if (!syncResult.success) {
-            console.warn('User sync failed, but continuing with app:', syncResult.error);
-            // Don't block the app - user might still be able to use it with demo data
-          } else {
-            console.log('User sync successful');
+          try {
+            const syncResult = await syncCurrentUser(client, user);
+            if (!syncResult.success) {
+              console.warn('User sync failed, but continuing with app:', syncResult.error);
+              // Don't block the app - user might still be able to use it with demo data
+              // Reset sync attempt flag so it can be retried later if needed
+              userSyncAttempted.current = false;
+            } else {
+              console.log('User sync successful');
+            }
+          } catch (syncError) {
+            console.error('User sync exception:', syncError);
+            userSyncAttempted.current = false;
+          } finally {
+            syncInProgress.current = false;
           }
         }
         
@@ -127,7 +151,7 @@ export function useClerkSupabaseAuth() {
     };
 
     initializeClient();
-  }, [isLoaded, isSignedIn, userId, user, createSupabaseClient, userSyncAttempted]);
+  }, [isLoaded, isSignedIn, userId, user, createSupabaseClient]);
 
   // Project creation function
   const createProject = async (projectData: ProjectData) => {

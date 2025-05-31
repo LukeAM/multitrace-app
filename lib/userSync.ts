@@ -8,7 +8,7 @@ export async function ensureUserExists(supabase: any, user: {
     const { data: existing, error: existingError } = await supabase
       .from('users')
       .select('id')
-      .eq('clerk_id', user.id)
+      .eq('clerk_user_id', user.id)
       .maybeSingle();
 
     if (existing) {
@@ -16,7 +16,7 @@ export async function ensureUserExists(supabase: any, user: {
     }
 
     const insertPayload = {
-      clerk_id: user.id,
+      clerk_user_id: user.id,
       email: user.email,
       name: `${user.firstName} ${user.lastName}`,
     };

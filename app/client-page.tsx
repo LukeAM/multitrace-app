@@ -43,7 +43,7 @@ export default function ClientPage() {
   const { session } = useSession();
   const { user } = useUser();
   const { currentFile, selectedTimelineEntry } = useAppStore();
-  
+
   // State variables
   const [visible, setVisible] = useState({
     sidebar: true,
@@ -73,7 +73,7 @@ export default function ClientPage() {
     
     const fetchProjects = async () => {
       try {
-        setLoading(true);
+      setLoading(true);
         console.log('Fetching projects for user:', userId);
         
         // Try to fetch projects - if we get RLS errors, fall back to demo data
@@ -82,7 +82,7 @@ export default function ClientPage() {
           .select('*, files(*)')
           .order('created_at', { ascending: false });
         
-        if (error) {
+      if (error) {
           console.log('Error fetching projects (expected with RLS):', error.message);
           console.log('Using demo project data');
           setProjects([demoProject]);
@@ -112,9 +112,9 @@ export default function ClientPage() {
       try {
         console.log('Fetching teams for user:', userId);
         
-        // First try to get team that was created by our trigger
+        // Try to get team that was created by user sync
         const teamId = `team-${userId}`;
-        console.log('Looking for auto-created team:', teamId);
+        console.log('Looking for team:', teamId);
         
         // Check if team exists directly
         const { data: teamData, error: teamError } = await supabaseClient
@@ -124,7 +124,7 @@ export default function ClientPage() {
           .single();
           
         if (teamData) {
-          console.log('Found auto-created team:', teamData.id);
+          console.log('Found team:', teamData.id);
           setActiveTeamId(teamData.id);
           setTeams([{ team_id: teamData.id }]);
           return;
@@ -147,39 +147,7 @@ export default function ClientPage() {
           console.log('Setting active team to:', data[0].team_id);
           setActiveTeamId(data[0].team_id);
         } else {
-          console.log('No teams found for user, creating a new team');
-          
-          // For new users, create a team automatically
-          const { data: newTeam, error: createError } = await supabaseClient
-            .from('teams')
-            .insert([
-              { id: teamId, name: 'My Team' }
-            ])
-            .select()
-            .single();
-            
-          if (createError) {
-            console.error('Error creating team:', createError);
-            return;
-          }
-          
-          console.log('Created new team:', newTeam);
-          
-          // Add user to the team
-          const { error: memberError } = await supabaseClient
-            .from('team_members')
-            .insert([
-              { team_id: teamId, user_id: userId, role: 'admin' }
-            ]);
-            
-          if (memberError) {
-            console.error('Error adding user to team:', memberError);
-            return;
-          }
-          
-          console.log('Added user to team successfully');
-          setActiveTeamId(teamId);
-          setTeams([{ team_id: teamId }]);
+          console.log('No teams found for user - user sync should have created one');
         }
       } catch (error) {
         console.error('Error in fetchTeams:', error);
@@ -243,7 +211,7 @@ export default function ClientPage() {
     if (isAuthReady && supabaseClient && activeTeamId) {
       try {
         const { data, error } = await supabaseClient
-          .from('accounts')
+        .from('accounts')
           .select('id, name, created_at, type')
           .eq('team_id', activeTeamId)
           .order('created_at', { ascending: false });
@@ -269,9 +237,9 @@ export default function ClientPage() {
     const fetchOpportunities = async () => {
       try {
         const { data, error } = await supabaseClient
-          .from('projects')
-          .select('*')
-          .eq('account_id', selectedAccount.id)
+        .from('projects')
+        .select('*')
+        .eq('account_id', selectedAccount.id)
           .order('created_at', { ascending: false });
           
         if (error) {
@@ -280,7 +248,7 @@ export default function ClientPage() {
         }
         
         setOpportunities(data || []);
-        setMainView('opportunities');
+      setMainView('opportunities');
       } catch (error) {
         console.error('Error in fetchOpportunities:', error);
       }

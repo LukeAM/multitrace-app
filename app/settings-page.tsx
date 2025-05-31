@@ -54,22 +54,22 @@ export default function ClientPage() {
     const setupInitialProject = async () => {
       try {
         const { data: existingProjects, error } = await supabaseClient
-          .from('projects')
-          .select('id')
+        .from('projects')
+        .select('id')
           .eq('owner_id', userId);
 
-        if (error) {
+      if (error) {
           console.log('Error checking existing projects (expected with RLS):', error.message);
-          return;
-        }
+        return;
+      }
 
-        if (existingProjects.length === 0) {
-          console.log('Creating default project…');
-          if (activeTeamId) {
+      if (existingProjects.length === 0) {
+        console.log('Creating default project…');
+        if (activeTeamId) {
             await createProjectWithTemplate(supabaseClient, 'Getting Started Project', userId, activeTeamId);
-          } else {
-            console.error('No active team ID for project creation');
-          }
+        } else {
+          console.error('No active team ID for project creation');
+        }
         }
       } catch (error) {
         console.error('Error in setupInitialProject:', error);
@@ -85,8 +85,8 @@ export default function ClientPage() {
     async function fetchTeams() {
       try {
         const { data, error } = await supabaseClient
-          .from('team_members')
-          .select('team_id')
+        .from('team_members')
+        .select('team_id')
           .eq('user_id', userId);
           
         if (error) {
@@ -94,8 +94,8 @@ export default function ClientPage() {
           return;
         }
         
-        setTeams(data || []);
-        if (data && data.length > 0) setActiveTeamId(data[0].team_id);
+      setTeams(data || []);
+      if (data && data.length > 0) setActiveTeamId(data[0].team_id);
       } catch (error) {
         console.error('Error in fetchTeams:', error);
       }
@@ -121,7 +121,7 @@ export default function ClientPage() {
         setAccounts(data || []);
       } catch (error) {
         console.error('Error in fetchAccounts:', error);
-      }
+    }
     };
     
     fetchAccounts();
@@ -144,7 +144,7 @@ export default function ClientPage() {
         }
         
         setOpportunities(data || []);
-        setMainView('opportunities');
+      setMainView('opportunities');
       } catch (error) {
         console.error('Error in fetchOpportunities:', error);
       }

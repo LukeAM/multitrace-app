@@ -2,13 +2,14 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import ClientPage from './client-page'; // Adjust path if needed
+import Link from 'next/link';
 
 export default async function HomePage() {
   try {
     // Check authentication status
-    const { userId } = auth();
-    
-    if (!userId) {
+  const { userId } = auth();
+
+  if (!userId) {
       console.log("User not authenticated, redirecting to sign-in");
       return redirect('/sign-in');
     }
@@ -19,10 +20,10 @@ export default async function HomePage() {
     if (!user) {
       console.log("User data not available, redirecting to sign-in");
       return redirect('/sign-in');
-    }
+  }
 
     // User is authenticated, render the client page
-    return <ClientPage />;
+  return <ClientPage />;
   } catch (error) {
     console.error("Error in HomePage:", error);
     // Don't redirect on error - show the error instead
@@ -34,12 +35,12 @@ export default async function HomePage() {
           <pre className="mt-4 overflow-auto rounded bg-red-100 p-2 text-left text-xs text-red-800">
             {error instanceof Error ? error.message : String(error)}
           </pre>
-          <a 
+          <Link 
             href="/"
             className="mt-4 inline-block rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
           >
             Refresh Page
-          </a>
+          </Link>
         </div>
       </div>
     );

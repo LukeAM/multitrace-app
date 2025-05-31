@@ -694,8 +694,8 @@ export default function Sidebar({ accounts, onSelect, selectedAccountId, onAccou
         
         // Fallback to team_members query
         const { data, error } = await supabaseClient
-          .from('team_members')
-          .select('team_id')
+      .from('team_members')
+      .select('team_id')
           .eq('user_id', user.id);
           
         if (error) {

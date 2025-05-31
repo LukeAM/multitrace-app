@@ -4,6 +4,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth, useUser } from '@clerk/nextjs';
 import { createClient } from '@supabase/supabase-js';
+import { syncCurrentUser } from './userSync';
 
 // Create a Supabase client without authentication
 export const supabase = createClient(
@@ -26,6 +27,7 @@ export function useClerkSupabaseAuth() {
   const [supabaseClient, setSupabaseClient] = useState(supabase);
   const [isReady, setIsReady] = useState(false);
   const [lastError, setLastError] = useState<Error | null>(null);
+  const [userSyncAttempted, setUserSyncAttempted] = useState(false);
 
   // Create a stable Supabase client
   const createSupabaseClient = useCallback(() => {
@@ -56,15 +58,6 @@ export function useClerkSupabaseAuth() {
         }
       );
       
-      // Set a custom claim that RLS can read
-      // This is a workaround since RLS can't read custom headers
-      (client as any).rpc = new Proxy((client as any).rpc, {
-        apply: async (target, thisArg, args) => {
-          const result = await target.apply(thisArg, args);
-          return result;
-        }
-      });
-      
       console.log('Created Supabase client with user context:', userId);
       return client;
     } catch (error) {
@@ -83,16 +76,31 @@ export function useClerkSupabaseAuth() {
       console.log('User not signed in, using anonymous Supabase client');
       setIsReady(false);
       setSupabaseClient(supabase);
+      setUserSyncAttempted(false);
       return;
     }
 
-    try {
-      const client = createSupabaseClient();
-      console.log('Debug - Clerk User ID format:', userId);
-      console.log('Debug - Clerk Email:', user.emailAddresses[0]?.emailAddress || 'none');
-      
-      // Test query to check RLS policy effectiveness
-      async function testQuery() {
+    const initializeClient = async () => {
+      try {
+        const client = createSupabaseClient();
+        console.log('Debug - Clerk User ID format:', userId);
+        console.log('Debug - Clerk Email:', user.emailAddresses[0]?.emailAddress || 'none');
+        
+        // Only attempt user sync once per session to prevent loops
+        if (!userSyncAttempted) {
+          console.log('Attempting to sync user to Supabase...');
+          setUserSyncAttempted(true);
+          
+          const syncResult = await syncCurrentUser(client, user);
+          if (!syncResult.success) {
+            console.warn('User sync failed, but continuing with app:', syncResult.error);
+            // Don't block the app - user might still be able to use it with demo data
+          } else {
+            console.log('User sync successful');
+          }
+        }
+        
+        // Test query to check RLS policy effectiveness
         try {
           const { data, error } = await client
             .from('projects')
@@ -100,27 +108,26 @@ export function useClerkSupabaseAuth() {
             .limit(1);
             
           if (error) {
-            console.error('Auth test query failed:', error.message);
-            console.error('Detailed error:', error);
+            console.log('Auth test query failed (expected with RLS):', error.message);
           } else {
             console.log('Auth test query succeeded:', data);
           }
         } catch (e) {
-          console.error('Test query exception:', e);
+          console.log('Test query exception (expected):', e);
         }
+        
+        setSupabaseClient(client);
+        setIsReady(true);
+        setLastError(null);
+      } catch (error) {
+        console.error('Error in initializeClient:', error);
+        setLastError(error instanceof Error ? error : new Error(String(error)));
+        setIsReady(false);
       }
-      
-      testQuery();
-      
-      setSupabaseClient(client);
-      setIsReady(true);
-      setLastError(null);
-    } catch (error) {
-      console.error('Error in useClerkSupabaseAuth effect:', error);
-      setLastError(error instanceof Error ? error : new Error(String(error)));
-      setIsReady(false);
-    }
-  }, [isLoaded, isSignedIn, userId, user, createSupabaseClient]);
+    };
+
+    initializeClient();
+  }, [isLoaded, isSignedIn, userId, user, createSupabaseClient, userSyncAttempted]);
 
   // Project creation function
   const createProject = async (projectData: ProjectData) => {

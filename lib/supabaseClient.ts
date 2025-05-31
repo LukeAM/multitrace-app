@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAuth } from '@clerk/nextjs';
+import { useAuth, useSession } from '@clerk/nextjs';
 import { createClient } from '@supabase/supabase-js';
 
 // Create a Supabase client without authentication for direct access
@@ -14,63 +14,82 @@ export const supabase = createClient(
 // Hook for getting an authenticated Supabase client
 export function useClerkSupabaseAuth() {
   const { getToken, isSignedIn, isLoaded } = useAuth();
+  const { session: clerkSession } = useSession();
   const [client, setClient] = useState(supabase);
   const [isAuthReady, setIsAuthReady] = useState(false);
 
   useEffect(() => {
-    // Create a new client for each session to avoid shared state issues
+    // Don't proceed if Clerk auth is not loaded yet
+    if (!isLoaded) return;
+
+    // Create a new supabase client for this session
     const supabaseClient = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    const setSupabaseAuth = async () => {
+    async function setupSupabaseAuth() {
       try {
-        // Only proceed if Clerk auth is fully loaded
-        if (!isLoaded) return;
-
-        if (isSignedIn) {
-          console.log('Clerk auth: User is signed in, getting token for Supabase');
+        if (isSignedIn && clerkSession) {
+          // Get JWT token from Clerk with Supabase template
+          console.log('Getting Supabase token from Clerk...');
           const token = await getToken({ template: 'supabase' });
           
-          if (token) {
-            console.log('Clerk token received, setting Supabase session');
-            const { error } = await supabaseClient.auth.setSession({
-              access_token: token,
-              refresh_token: '',
-            });
-            
-            if (error) {
-              console.error('Error setting Supabase session:', error);
-            } else {
-              console.log('Supabase session set successfully');
-              setClient(supabaseClient);
-            }
-          } else {
-            console.error('Failed to get token from Clerk');
+          if (!token) {
+            console.error('Failed to get Supabase token from Clerk');
+            return;
           }
-        } else if (isLoaded) {
-          console.log('User not signed in or Clerk auth not loaded yet');
+          
+          console.log('Setting Supabase session with Clerk token...');
+          // Set the Supabase session with the token from Clerk
+          const { data, error } = await supabaseClient.auth.setSession({
+            access_token: token,
+            refresh_token: '',  // Not needed with Clerk
+          });
+          
+          if (error) {
+            console.error('Error setting Supabase session:', error.message);
+            return;
+          }
+          
+          console.log('Supabase session set successfully');
+          // Check if user is actually authenticated
+          const { data: userData, error: userError } = await supabaseClient.auth.getUser();
+          
+          if (userError) {
+            console.error('Failed to get user from Supabase:', userError.message);
+            return;
+          }
+          
+          if (userData?.user) {
+            console.log('Supabase user authenticated:', userData.user.id);
+            setClient(supabaseClient);
+            setIsAuthReady(true);
+          } else {
+            console.error('No user found in Supabase response');
+          }
+        } else {
+          console.log('User not signed in with Clerk');
           await supabaseClient.auth.signOut();
         }
-        
-        setIsAuthReady(true);
       } catch (error) {
-        console.error('Error setting up Supabase auth:', error);
+        console.error('Error in setupSupabaseAuth:', error);
       }
-    };
+    }
 
-    setSupabaseAuth();
+    setupSupabaseAuth();
     
-    // Refresh token periodically
+    // Set up interval to refresh the token
     const refreshInterval = setInterval(() => {
-      if (isSignedIn && isLoaded) {
-        setSupabaseAuth();
+      if (isSignedIn && clerkSession) {
+        setupSupabaseAuth();
       }
-    }, 10 * 60 * 1000); // Refresh every 10 minutes
+    }, 5 * 60 * 1000); // Refresh every 5 minutes
     
-    return () => clearInterval(refreshInterval);
-  }, [getToken, isSignedIn, isLoaded]);
+    return () => {
+      clearInterval(refreshInterval);
+    };
+  }, [isLoaded, isSignedIn, clerkSession, getToken]);
 
-  return client;
+  return isAuthReady ? client : null;
 }

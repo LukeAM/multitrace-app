@@ -68,19 +68,35 @@ export default function ClientPage() {
   // Check if auth is ready before attempting data operations
   useEffect(() => {
     if (isLoaded) {
-      if (isSignedIn && session) {
-        console.log('Auth is ready, user is signed in');
-        setAuthInitialized(true);
-        setAuthError(null);
-      } else if (isSignedIn && !session) {
-        console.log('User signed in but session not available yet');
-        setAuthError('Session not available yet');
-      } else {
-        console.log('User not signed in');
-        setAuthError('Not signed in');
+      if (!isSignedIn) {
+        setAuthError('Not signed in with Clerk');
+        setLoading(false);
+        return;
       }
+      
+      if (!session) {
+        setAuthError('Clerk session not available');
+        setLoading(false);
+        return;
+      }
+
+      console.log('Clerk authentication successful');
+      
+      // We don't set authInitialized here - we wait for Supabase client to be ready
     }
   }, [isLoaded, isSignedIn, session]);
+  
+  // Watch for Supabase client to be ready
+  useEffect(() => {
+    if (supabaseClient) {
+      console.log('Supabase client is ready');
+      setAuthInitialized(true);
+      setAuthError(null);
+    } else if (isLoaded && isSignedIn && session) {
+      // If Clerk is authenticated but Supabase client is null, we have an auth issue
+      console.log('Supabase client not ready despite Clerk being authenticated');
+    }
+  }, [supabaseClient, isLoaded, isSignedIn, session]);
 
   // Fetch projects only after auth is confirmed
   useEffect(() => {
@@ -240,6 +256,18 @@ export default function ClientPage() {
   // If loading or auth error, show appropriate message
   if (loading) {
     return <div className="flex h-screen items-center justify-center">Loading projects…</div>;
+  }
+
+  if (!supabaseClient && isLoaded && isSignedIn) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center p-4">
+        <div className="mb-4 text-xl font-bold text-red-500">Authentication Error</div>
+        <div className="mb-6">Supabase authentication failed. Please try signing in again.</div>
+        <a href="/sign-in" className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600">
+          Sign In Again
+        </a>
+      </div>
+    );
   }
 
   if (authError) {
